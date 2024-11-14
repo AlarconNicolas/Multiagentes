@@ -33,6 +33,12 @@ def agent_portrayal(agent):
         portrayal["w"] = 0.8
         portrayal["h"] = 0.8
 
+    if (isinstance(agent, Car)):
+        portrayal["Color"] = "darkblue"
+        portrayal["Layer"] = 1
+        portrayal["Shape"] = "circle"
+        portrayal["r"] = 0.5
+
     return portrayal
 
 width = 0
