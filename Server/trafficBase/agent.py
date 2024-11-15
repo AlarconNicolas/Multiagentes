@@ -3,92 +3,108 @@ from collections import defaultdict
 
 class Car(Agent):
     """
-    Car agent that moves according to road rules, considering obstacles, traffic lights, and road directions.
+    Car agent that follows a calculated path to its destination while respecting traffic rules.
     """
     def __init__(self, unique_id, model, destination):
         super().__init__(unique_id, model)
-        self.direction = None
-        self.last_direction = None 
         self.destination = destination
+        self.current_path = None
+        self.path_index = 0
+        self.recalculate_path()
 
-    def get_road_direction(self):
+    def recalculate_path(self):
         """
-        Gets the direction of the road the car is currently on.
-        If no road is found, uses the last known direction.
+        Calculates or recalculates the path to the destination.
         """
-        cell_contents = self.model.grid.get_cell_list_contents([self.pos])
-        for agent in cell_contents:
-            if isinstance(agent, Road):
-                self.last_direction = agent.direction  # Update last direction
-                return agent.direction
-        return self.last_direction  # Return the last known direction if no road is found
+        if self.pos and self.destination:
+            self.current_path = self.model.find_path(self.pos, self.destination)
+            self.path_index = 0
 
     def check_traffic_light(self, next_pos):
         """
-        Checks if there's a traffic light at the next position and returns its state (True for green, False for red).
+        Checks if there's a traffic light at the next position and returns its state.
+        Returns True for green, False for red.
         """
         next_cell_contents = self.model.grid.get_cell_list_contents([next_pos])
         for agent in next_cell_contents:
             if isinstance(agent, Traffic_Light):
-                return agent.state  # True for green, False for red
-        return True  # No traffic light, proceed as if green
+                return agent.state
+        return True
 
     def check_for_obstacles(self, next_pos):
         """
         Checks if there are obstacles or other cars at the next position.
-        Returns False if the car cannot move to the next position.
+        Returns False if the position is blocked.
         """
         next_cell_contents = self.model.grid.get_cell_list_contents([next_pos])
         for agent in next_cell_contents:
             if isinstance(agent, (Obstacle, Car)):
-                return False  # Cannot move if there's an obstacle or another car
+                return False
         return True
+
+    def get_next_position(self):
+        """
+        Gets the next position from the calculated path.
+        Returns None if no valid next position is available.
+        """
+        if (not self.current_path or 
+            self.path_index >= len(self.current_path) - 1):
+            return None
+            
+        return self.current_path[self.path_index + 1]
 
     def move(self):
         """
-        Moves the car according to road rules, considering traffic lights, obstacles, and road directions.
+        Moves the car along its calculated path while respecting traffic rules.
         """
-        road_direction = self.get_road_direction()
-        if road_direction is None:  # Return if no direction is available
+        # Check if we've reached the destination
+        if self.pos == self.destination:
+            self.model.grid.remove_agent(self)
+            self.model.schedule.remove(self)
+            self.model.reached_destination += 1
+            self.model.in_grid -= 1
             return
-        
-        direction_to_move = {
-            "Up": (0, 1),
-            "Down": (0, -1),
-            "Left": (-1, 0),
-            "Right": (1, 0),
-            "^": (0, 1),
-            "v": (0, -1),
-            "<": (-1, 0),
-            ">": (1, 0)
-        }
 
-        # Get the movement vector based on road direction
-        movement = direction_to_move.get(road_direction)
-        if movement:
-            next_pos = (self.pos[0] + movement[0], self.pos[1] + movement[1])
-            
-            # Check if next position is within grid bounds
-            if (0 <= next_pos[0] < self.model.grid.width and
-                0 <= next_pos[1] < self.model.grid.height):
-                
-                # Check for obstacles
-                if not self.check_for_obstacles(next_pos):
-                    return  # If there's an obstacle, do not move
-                
-                # Check traffic light state
-                if not self.check_traffic_light(next_pos):
-                    return  # If the light is red, do not move
-                
-                # Move if there is a road or traffic light at the next position
-                next_cell_contents = self.model.grid.get_cell_list_contents([next_pos])
-                if any(isinstance(agent, (Road, Traffic_Light)) for agent in next_cell_contents):
-                    self.model.grid.move_agent(self, next_pos)
+        # Get next position from path
+        next_pos = self.get_next_position()
+        if not next_pos:
+            # If no next position, try to recalculate path
+            self.recalculate_path()
+            return
+
+        # Check if next position is within grid bounds
+        if (not (0 <= next_pos[0] < self.model.grid.width and
+                0 <= next_pos[1] < self.model.grid.height)):
+            self.recalculate_path()
+            return
+
+        # Check for obstacles and traffic lights
+        if not self.check_for_obstacles(next_pos):
+            # If blocked by obstacle/car, wait
+            return
+
+        if not self.check_traffic_light(next_pos):
+            # If red light, wait
+            return
+
+        # Move to next position
+        self.model.grid.move_agent(self, next_pos)
+        self.path_index += 1
+
+        # If we've completed the current path segment
+        if self.path_index >= len(self.current_path) - 1:
+            self.recalculate_path()
 
     def step(self):
         """
-        Determines the new direction and moves the car.
+        Performs one step of the car's movement.
         """
+        # If no path exists, try to calculate one
+        if not self.current_path:
+            self.recalculate_path()
+            if not self.current_path:
+                return
+
         self.move()
 
 class Traffic_Light(Agent):
