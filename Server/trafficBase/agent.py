@@ -10,6 +10,7 @@ class Car(Agent):
         self.destination = destination
         self.current_path = None
         self.path_index = 0
+        print(f"Car {unique_id} initialized with destination {destination}")
         self.recalculate_path()
 
     def recalculate_path(self):
