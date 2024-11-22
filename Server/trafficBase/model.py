@@ -2,7 +2,7 @@ from mesa import Model
 from mesa.datacollection import DataCollector
 from mesa.time import RandomActivation
 from mesa.space import MultiGrid
-from agent import *
+from .agent import *
 import json
 import random
 import networkx as nx
@@ -22,13 +22,13 @@ class CityModel(Model):
         )
         
         # Load the map dictionary
-        dataDictionary = json.load(open("../static/city_files/mapDictionary.json"))
+        dataDictionary = json.load(open("./static/city_files/mapDictionary.json"))
         self.traffic_lights = []
         self.destinations = []
         self.corner_positions = []
         
         # Load the map file and create graph
-        map_path = '../static/city_files/2022_base.txt'
+        map_path = './static/city_files/2022_base.txt'
         with open(map_path) as baseFile:
             lines = baseFile.readlines()
             self.width = len(lines[0])-1
