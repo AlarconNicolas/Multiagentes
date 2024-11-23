@@ -52,7 +52,7 @@ class Agent3D {
   }
 }
 class TrafficLight3D {
-  constructor(id, position=[1,1,3], rotation=[0,5,0], scale=[1,1,1]){
+  constructor(id, position=[1,1,3], rotation=[0,0,0], scale=[1,1,1]){
   this.id = id;
   this.position = position;
   this.rotation = rotation;
@@ -78,6 +78,7 @@ const agent_server_uri = "http://localhost:8585/";
 const agents = [];
 const obstacles = [];
 const traficLights= [];
+const roads=[];
 
 // Initialize WebGL-related variables
 let gl, programInfo, agentArrays, obstacleArrays, agentsBufferInfo, obstaclesBufferInfo, agentsVao, obstaclesVao,wheelVAO,wheelBufferInfo,TrafficLightArrays,TrafficLightBuffer,TrafficLightVAO;
@@ -160,8 +161,8 @@ async function main() {
   programInfo = twgl.createProgramInfo(gl, [vsGLSL, fsGLSL]);
   
 
-  const newTrafficLight = new TrafficLight3D('trafficLight', [5, 0, 3]);
-  traficLights.push(newTrafficLight);
+  //const newTrafficLight = new TrafficLight3D('trafficLight', [5, 0, 3]);
+  //traficLights.push(newTrafficLight);
 
   const obj3 = await loadObj('./Figures/coche.obj',true);
   objcetsCar.model.arrays = obj3;
@@ -444,7 +445,7 @@ function drawTrafficLights(distance, trafficLightVAO, trafficLightBufferInfo, vi
 
       // Create the traffic light's transformation matrix
       const light_trans = twgl.v3.create(x, y, z);
-      const light_scale = twgl.v3.create(...trafficLight.scale);
+      const light_scale = twgl.v3.create(0.5, 0.5, 0.5);;
 
       // Calculate the traffic light's matrix
       trafficLight.matrix = twgl.m4.translate(viewProjectionMatrix, light_trans);
@@ -799,7 +800,8 @@ async function loadObj(route, shouldScaleSmall) {
                   const scaledVertex = vertex.map(coord => coord * scale);
 
                   structure.a_position.data.push(...scaledVertex);
-                  structure.a_color.data.push(1.0, 0.5, 0.0, 1.0);  // Fixed color for all vertices
+                  if(shouldScaleSmall){structure.a_color.data.push(1.0, 0.5, 0.0, 1.0);}
+                  else{structure.a_color.data.push(1.0, 0.0, 0.5, 1.0);}  // Fixed color for all vertices
                   structure.a_normal.data.push(...normal);
               }
           }
