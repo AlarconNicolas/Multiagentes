@@ -51,41 +51,30 @@ def getAgents():
     global randomModel
 
     if request.method == 'GET':
-        print("REQUEST METHOD ACCEPTED")
         try:
-            if randomModel and not any(isinstance(a, Car) for a, p in randomModel.grid.coord_iter()):
-                test_car = Car("debug_car", randomModel, None)
-                randomModel.grid.place_agent(test_car, (0, 0))
-                randomModel.schedule.add(test_car)
-                print("Manually placed a debug car at (0,0)")
-            test_position=(0,0)
-            placed_agent = randomModel.grid.get_cell_list_contents(test_position)[0]
-            
-            if test_car in randomModel.grid.get_cell_list_contents(test_position):
-                print("Debug car successfully placed in the grid at", test_position)
-            else:
-                print("Debug car not found in the grid at", test_position)
+            if not randomModel:
+                return jsonify({"message": "Model not initialized"}), 400
 
+            # Get car positions from the schedule instead
+            car_positions = []
+            for agent in randomModel.schedule.agents:
+                if isinstance(agent, Car):
+                    car_positions.append({
+                        "id": agent.unique_id,
+                        "x": agent.pos[0],
+                        "y": 1,
+                        "z": agent.pos[1]  # Using y coordinate as z for 3D
+                    })
             
-            agentPositions = [
-                {"id": a.unique_id, "x": pos[0], "y": 1, "z": 1}
-                for a, pos in randomModel.grid.coord_iter()
-                if isinstance(a, Car)
-            ]
-            car_instances = [
-            (agent, pos) for agent, pos in randomModel.grid.coord_iter() if isinstance(agent, Car)
-            ]
-            if car_instances:
-                print(f"Found {len(car_instances)} car instances in the map.")
-            else:
-                print("No car instances found in the map.")
-            print("Agent Locations:", agentPositions)
-
-            return jsonify({'positions': agentPositions})
+            print(f"Found {len(car_positions)} cars")
+            for pos in car_positions:
+                print(f"Car {pos['id']} at position ({pos['x']}, {pos['z']})")
+                
+            return jsonify({'positions': car_positions})
 
         except Exception as e:
-            print(e)
-            return jsonify({"message": "Error retrieving agent positions"}), 500
+            print(f"Error in getAgents: {str(e)}")
+            return jsonify({"message": f"Error retrieving agent positions: {str(e)}"}), 500
 
 @app.route('/getObstacles', methods=['GET'])
 @cross_origin()
@@ -114,17 +103,29 @@ def getLights():
 
     if request.method == 'GET':
         try:
-            lightPositions = [
-                {"id": a.unique_id, "x": pos[0], "y": 1, "z": pos[1], "state": a.state}
-                for a, pos in randomModel.grid.coord_iter()
-                if isinstance(a, Traffic_Light)
-            ]
-            print("Light Locations:", lightPositions)
-            return jsonify({'positions': lightPositions})
+            if not randomModel:
+                return jsonify({"message": "Model not initialized"}), 400
+
+            # Get car positions from the schedule instead
+            light_positions = []
+            for agent in randomModel.schedule.agents:
+                if isinstance(agent, Traffic_Light):
+                    light_positions.append({
+                        "id": agent.unique_id,
+                        "x": agent.pos[0],
+                        "y": 2,
+                        "z": agent.pos[1]  # Using y coordinate as z for 3D
+                    })
+            
+            print(f"Found {len(light_positions)} Lights")
+            for pos in light_positions:
+                print(f"Light {pos['id']} at position ({pos['x']}, {pos['z']})")
+                
+            return jsonify({'positions': light_positions})
 
         except Exception as e:
-            print(e)
-            return jsonify({"message": "Error retrieving traffic light positions"}), 500
+            print(f"Error in getAgents: {str(e)}")
+            return jsonify({"message": f"Error retrieving agent positions: {str(e)}"}), 500
 
 @app.route('/update', methods=['GET'])
 @cross_origin()
