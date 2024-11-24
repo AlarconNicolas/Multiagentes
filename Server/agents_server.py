@@ -5,7 +5,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
 from trafficBase.model import CityModel
-from trafficBase.agent import Car, Traffic_Light, Obstacle
+from trafficBase.agent import Car, Traffic_Light, Obstacle,Road
 
 # Size of the board:
 width = 28
@@ -57,14 +57,16 @@ def getAgents():
 
             # Get car positions from the schedule instead
             car_positions = []
-            for agent in randomModel.schedule.agents:
-                if isinstance(agent, Car):
-                    car_positions.append({
-                        "id": agent.unique_id,
-                        "x": agent.pos[0],
-                        "y": 1,
-                        "z": agent.pos[1]  # Using y coordinate as z for 3D
-                    })
+            for agents, pos in randomModel.grid.coord_iter():
+            # for agent in randomModel.schedule.agents:
+                for agent in agents:
+                    if isinstance(agent, Car):
+                        car_positions.append({
+                            "id": agent.unique_id,
+                            "x": agent.pos[0],
+                            "y": 1,
+                            "z": agent.pos[1]  # Using y coordinate as z for 3D
+                        })
             
             print(f"Found {len(car_positions)} cars")
             for pos in car_positions:
@@ -76,24 +78,39 @@ def getAgents():
             print(f"Error in getAgents: {str(e)}")
             return jsonify({"message": f"Error retrieving agent positions: {str(e)}"}), 500
 
-@app.route('/getObstacles', methods=['GET'])
+@app.route('/getBuildings', methods=['GET'])
 @cross_origin()
-def getObstacles():
-    """Retrieve the positions of all obstacles in the model."""
+def getBuildings():
+    """Retrieve the positions of all cars in the model."""
     global randomModel
 
     if request.method == 'GET':
         try:
-            obstaclePositions = [
-                {"id": a.unique_id, "x": pos[0], "y": 1, "z": pos[1]}
-                for a, pos in randomModel.grid.coord_iter()
-                if isinstance(a, Obstacle)
-            ]
-            return jsonify({'positions': obstaclePositions})
+            if not randomModel:
+                return jsonify({"message": "Model not initialized"}), 400
+
+            # Get car positions from the schedule instead
+            obstacles_positions = []
+            for agents, pos in randomModel.grid.coord_iter():
+            # for agent in randomModel.schedule.agents:
+                for agent in agents:
+                    if isinstance(agent, Obstacle):
+                        obstacles_positions.append({
+                            "id": agent.unique_id,
+                            "x": agent.pos[0],
+                            "y": 1,
+                            "z": agent.pos[1]  # Using y coordinate as z for 3D
+                        })
+            
+            print(f"Found {len(obstacles_positions)} obstacles")
+            for pos in obstacles_positions:
+                print(f"Obstacle {pos['id']} at position ({pos['x']}, {pos['z']})")
+                
+            return jsonify({'positions': obstacles_positions})
 
         except Exception as e:
-            print(e)
-            return jsonify({"message": "Error retrieving obstacle positions"}), 500
+            print(f"Error in getObstacles: {str(e)}")
+            return jsonify({"message": f"Error retrieving obstacles positions: {str(e)}"}), 500
 
 @app.route('/getLights', methods=['GET'])
 @cross_origin()
@@ -126,6 +143,41 @@ def getLights():
         except Exception as e:
             print(f"Error in getAgents: {str(e)}")
             return jsonify({"message": f"Error retrieving agent positions: {str(e)}"}), 500
+        
+
+@app.route('/getRoads', methods=['GET'])
+@cross_origin()
+def getRoads():
+    """Retrieve the positions of all cars in the model."""
+    global randomModel
+
+    if request.method == 'GET':
+        try:
+            if not randomModel:
+                return jsonify({"message": "Model not initialized"}), 400
+
+            # Get car positions from the schedule instead
+            Roads_positions = []
+            for agents, pos in randomModel.grid.coord_iter():
+            # for agent in randomModel.schedule.agents:
+                for agent in agents:
+                    if isinstance(agent,Road ) or isinstance(agent,Traffic_Light ) :
+                        Roads_positions.append({
+                            "id": agent.unique_id,
+                            "x": agent.pos[0],
+                            "y": 1,
+                            "z": agent.pos[1]  # Using y coordinate as z for 3D
+                        })
+            
+            print(f"Found {len(Roads_positions)} Roads")
+            for pos in Roads_positions:
+                print(f"Roads {pos['id']} at position ({pos['x']}, {pos['z']})")
+                
+            return jsonify({'positions': Roads_positions})
+
+        except Exception as e:
+            print(f"Error in getObstacles: {str(e)}")
+            return jsonify({"message": f"Error retrieving obstacles positions: {str(e)}"}), 500
 
 @app.route('/update', methods=['GET'])
 @cross_origin()
