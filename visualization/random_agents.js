@@ -32,9 +32,9 @@ outColor = v_color;
 }
 `;
 
-// Define the Object3D class to represent 3D objcetsCar
-class Object3D {
-  constructor(id, position=[0,0,0], rotation=[0,0,0], scale=[1,1,1]){
+// Define the Building3D class to represent 3D objcetsCar
+class Building3D {
+  constructor(id, position=[0,0,0], rotation=[0,0,0], scale=[0.5,0.5,0.5]){
   this.id = id;
   this.position = position;
   this.rotation = rotation;
@@ -49,6 +49,8 @@ class Agent3D {
   this.rotation = rotation;
   this.scale = scale;
   this.matrix = twgl.m4.create();
+  this.previousPosition = position; // Store previous position to calculate direction
+  this.heading = 0;
   }
 }
 class TrafficLight3D {
@@ -62,7 +64,7 @@ class TrafficLight3D {
 }
 
 class Road3D {
-  constructor(id, position=[1,1,3], rotation=[0,0,0], scale=[1,1,1]){
+  constructor(id, position=[1,1,3], rotation=[0,0,0], scale=[0.5,0.5,0.5]){
   this.id = id;
   this.position = position;
   this.rotation = rotation;
@@ -76,12 +78,12 @@ const agent_server_uri = "http://localhost:8585/";
 
 // Initialize arrays to store agents and obstacles
 const agents = [];
-const obstacles = [];
+const Buildings = [];
 const traficLights= [];
-const roads=[];
+const Roads=[];
 
 // Initialize WebGL-related variables
-let gl, programInfo, agentArrays, obstacleArrays, agentsBufferInfo, obstaclesBufferInfo, agentsVao, obstaclesVao,wheelVAO,wheelBufferInfo,TrafficLightArrays,TrafficLightBuffer,TrafficLightVAO;
+let gl, programInfo, agentArrays, agentsBufferInfo, agentsVao, BuildingVAO,wheelVAO,wheelBufferInfo,TrafficLightArrays,TrafficLightBuffer,TrafficLightVAO,BuildingBuffer,RoadBuffer,RoadVAO;
 
 // Define the camera position
 let cameraPosition = {x:0, y:9, z:9};
@@ -153,6 +155,65 @@ const objcetsTrafficLight = {
       vao: undefined,
   }
 }
+const objcetsBuilding= {
+  model: {
+      transforms: {
+          // Translation
+          t: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Rotation in degrees
+          rd: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Rotation in radians
+          rr: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Scale
+          s: {
+              x: 1,
+              y: 1,
+              z: 1},
+      },
+      arrays: undefined,
+      bufferInfo: undefined,
+      vao: undefined,
+  }
+}
+
+const objcetsRoads= {
+  model: {
+      transforms: {
+          // Translation
+          t: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Rotation in degrees
+          rd: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Rotation in radians
+          rr: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Scale
+          s: {
+              x: 1,
+              y: 1,
+              z: 1},
+      },
+      arrays: undefined,
+      bufferInfo: undefined,
+      vao: undefined,
+  }
+}
 // Main function to initialize and run the application
 async function main() {
   const canvas = document.querySelector('canvas');
@@ -164,37 +225,52 @@ async function main() {
   //const newTrafficLight = new TrafficLight3D('trafficLight', [5, 0, 3]);
   //traficLights.push(newTrafficLight);
 
-  const obj3 = await loadObj('./Figures/coche.obj',true);
+  const obj3 = await loadObj('./Figures/coche.obj',true,"Car");
   objcetsCar.model.arrays = obj3;
 
-  const obj4 = await loadObj('./Figures/Semaforo.obj',false);
+  const obj4 = await loadObj('./Figures/Semaforo.obj',false,"TrafficLight");
   objcetsTrafficLight.model.arrays = obj4;
+
+  const obj5 = await loadObj('./Figures/Building.obj',false,"Building");
+  objcetsBuilding.model.arrays = obj5;
+
+  const obj6 = await loadObj('./Figures/Road.obj',false,"Road");
+  objcetsRoads.model.arrays = obj6;
+  
+  
   console.log("LightArray",objcetsTrafficLight.model.arrays )
-  console.log("ARRAY:", objcetsCar.model.arrays);
+  console.log("Car ARRAY:", objcetsCar.model.arrays);
+  console.log("Building ARRAY:", objcetsBuilding.model.arrays);
+  console.log("Road ARRAY:", objcetsRoads.model.arrays);
   
   //agentArrays = generateData(1);
-  obstacleArrays = generateObstacleData(1);
+  //obstacleArrays = generateObstacleData(1);
   
   // Create buffer infos
   //agentsBufferInfo = twgl.createBufferInfoFromArrays(gl, agentArrays);
   wheelBufferInfo = twgl.createBufferInfoFromArrays(gl, objcetsCar.model.arrays);
   TrafficLightBuffer = twgl.createBufferInfoFromArrays(gl, objcetsTrafficLight.model.arrays);
-  obstaclesBufferInfo = twgl.createBufferInfoFromArrays(gl, obstacleArrays);
+  BuildingBuffer = twgl.createBufferInfoFromArrays(gl, objcetsBuilding.model.arrays);
+  RoadBuffer = twgl.createBufferInfoFromArrays(gl, objcetsRoads.model.arrays);
+  //BuildingBuffer = twgl.createBufferInfoFromArrays(gl, obstacleArrays);
   
   // Create VAOs
   //agentsVao = twgl.createVAOFromBufferInfo(gl, programInfo, agentsBufferInfo);
   wheelVAO = twgl.createVAOFromBufferInfo(gl, programInfo, wheelBufferInfo);
   TrafficLightVAO = twgl.createVAOFromBufferInfo(gl, programInfo, TrafficLightBuffer);
-  obstaclesVao = twgl.createVAOFromBufferInfo(gl, programInfo, obstaclesBufferInfo);
+  BuildingVAO = twgl.createVAOFromBufferInfo(gl, programInfo, BuildingBuffer);
+  RoadVAO = twgl.createVAOFromBufferInfo(gl, programInfo, RoadBuffer);
+  //BuildingVAO = twgl.createVAOFromBufferInfo(gl, programInfo, BuildingBuffer);
   
   setupUI();
   await initAgentsModel();
   await getLights();
   await getAgents();
-  await getObstacles();
+  await getBuildings();
+  await getRoads();
   
   // Pass parameters in the correct order
-  await drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, obstaclesVao, obstaclesBufferInfo, TrafficLightBuffer, TrafficLightVAO);
+  await drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer, TrafficLightBuffer, TrafficLightVAO,RoadVAO,RoadBuffer);
 }
 
 
@@ -228,47 +304,39 @@ async function initAgentsModel() {
  * Retrieves the current positions of all agents from the agent server.
  */
 async function getAgents() {
-  console.log("ENTERED GETAGENTS")
   try {
-    // Send a GET request to the agent server to retrieve the agent positions
-    let response = await fetch(agent_server_uri + "getAgents") 
-    console.log("FETCHED AGENTS")
-    // Check if the response was successful
+    let response = await fetch(agent_server_uri + "getAgents");
     if(response.ok){
-      // Parse the response as JSON
-      let result = await response.json()
-
-      // Log the agent positions
-      console.log(result.positions)
-
-      // Check if the agents array is empty
+      let result = await response.json();
+      
       if(agents.length == 0){
-        // Create new agents and add them to the agents array
+        // Create new agents
         for (const agent of result.positions) {
-          const newAgent = new Agent3D(agent.id, [agent.x, agent.y, agent.z])
-          agents.push(newAgent)
+          const newAgent = new Agent3D(agent.id, [agent.x, agent.y, agent.z]);
+          agents.push(newAgent);
         }
-        // Log the agents array
-        console.log("AgentsCar:", agents)
-
       } else {
-        // Update the positions of existing agents
+        // Update existing agents
         for (const agent of result.positions) {
-          const current_agent = agents.find((object3d) => object3d.id == agent.id)
-
-          // Check if the agent exists in the agents array
+          const current_agent = agents.find((Agent3D) => Agent3D.id == agent.id);
+          
           if(current_agent != undefined){
-            // Update the agent's position
-            current_agent.position = [agent.x, agent.y, agent.z]
+            // Store previous position before updating
+            current_agent.previousPosition = [...current_agent.position];
+            // Update position
+            current_agent.position = [agent.x, agent.y, agent.z];
+            
+            // Calculate new heading
+            const newHeading = calculateHeading(current_agent.position, current_agent.previousPosition);
+            if (newHeading !== null) {
+              current_agent.heading = newHeading;
+            }
           }
         }
       }
     }
-
   } catch (error) {
-    // Log any errors that occur during the request
-    console.log("CAR NOT FOUND")
-    console.log(error) 
+    console.log(error);
   }
 }
 
@@ -307,10 +375,10 @@ async function getLights() {
 /*
  * Retrieves the current positions of all obstacles from the agent server.
  */
-async function getObstacles() {
+async function getBuildings() {
   try {
     // Send a GET request to the agent server to retrieve the obstacle positions
-    let response = await fetch(agent_server_uri + "getObstacles") 
+    let response = await fetch(agent_server_uri + "getBuildings") 
 
     // Check if the response was successful
     if(response.ok){
@@ -319,11 +387,36 @@ async function getObstacles() {
 
       // Create new obstacles and add them to the obstacles array
       for (const obstacle of result.positions) {
-        const newObstacle = new Object3D(obstacle.id, [obstacle.x, obstacle.y, obstacle.z])
-        obstacles.push(newObstacle)
+        const newObstacle = new Building3D(obstacle.id, [obstacle.x, obstacle.y, obstacle.z])
+        Buildings.push(newObstacle)
       }
       // Log the obstacles array
       console.log("Obstacles:", obstacles)
+    }
+
+  } catch (error) {
+    // Log any errors that occur during the request
+    console.log(error) 
+  }
+}
+
+async function getRoads() {
+  try {
+    // Send a GET request to the agent server to retrieve the obstacle positions
+    let response = await fetch(agent_server_uri + "getRoads") 
+
+    // Check if the response was successful
+    if(response.ok){
+      // Parse the response as JSON
+      let result = await response.json()
+
+      // Create new obstacles and add them to the obstacles array
+      for (const Road of result.positions) {
+        const newRoad = new Building3D(Road.id, [Road.x, Road.y, Road.z])
+        Roads.push(newRoad)
+      }
+      // Log the obstacles array
+      console.log("Roads:", Road)
     }
 
   } catch (error) {
@@ -361,10 +454,10 @@ async function update() {
  * @param {Object} programInfo - The program information.
  * @param {WebGLVertexArrayObject} agentsVao - The vertex array object for agents.
  * @param {Object} agentsBufferInfo - The buffer information for agents.
- * @param {WebGLVertexArrayObject} obstaclesVao - The vertex array object for obstacles.
- * @param {Object} obstaclesBufferInfo - The buffer information for obstacles.
+ * @param {WebGLVertexArrayObject} BuildingVAO - The vertex array object for obstacles.
+ * @param {Object} BuildingBuffer - The buffer information for obstacles.
  */
-async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, obstaclesVao, obstaclesBufferInfo,TrafficLightBuffer,TrafficLightVAO) {
+async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer,TrafficLightBuffer,TrafficLightVAO,RoadVAO,RoadBuffer) {
   twgl.resizeCanvasToDisplaySize(gl.canvas);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl.clearColor(0.2, 0.2, 0.2, 1);
@@ -378,7 +471,8 @@ async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, obstaclesVa
   // Pass wheelVAO and wheelBufferInfo instead of agentsVao and agentsBufferInfo
   drawAgents(distance, wheelVAO, wheelBufferInfo, viewProjectionMatrix); 
   drawTrafficLights(distance, TrafficLightVAO, TrafficLightBuffer, viewProjectionMatrix); 
-  drawObstacles(distance, obstaclesVao, obstaclesBufferInfo, viewProjectionMatrix);
+  drawBuildings(distance, BuildingVAO, BuildingBuffer, viewProjectionMatrix);
+  drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix);
 
   frameCount++;
 
@@ -387,7 +481,7 @@ async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, obstaclesVa
       await update();
   } 
 
-  requestAnimationFrame(() => drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, obstaclesVao, obstaclesBufferInfo,TrafficLightBuffer,TrafficLightVAO));
+  requestAnimationFrame(() => drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer,TrafficLightBuffer,TrafficLightVAO,RoadVAO,RoadBuffer));
 }
 
 
@@ -400,37 +494,32 @@ async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, obstaclesVa
  * @param {Float32Array} viewProjectionMatrix - The view-projection matrix.
  */
 function drawAgents(distance, agentsVao, agentsBufferInfo, viewProjectionMatrix){
-    // Bind the vertex array object for agents
-    gl.bindVertexArray(agentsVao);
-
-    // Iterate over the agents
-    for(const agent of agents){
-
-      
-      // Calculate the agent's position
-      let x = agent.position[0] * distance, y = agent.position[1] * distance, z = agent.position[2]
-
-      // Create the agent's transformation matrix
-      const cube_trans = twgl.v3.create(...agent.position);
-      const cube_scale = twgl.v3.create(...agent.scale);
-
-      // Calculate the agent's matrix
-      agent.matrix = twgl.m4.translate(viewProjectionMatrix, cube_trans);
-      agent.matrix = twgl.m4.rotateX(agent.matrix, agent.rotation[0]);
-      agent.matrix = twgl.m4.rotateY(agent.matrix, agent.rotation[1]);
-      agent.matrix = twgl.m4.rotateZ(agent.matrix, agent.rotation[2]);
-      agent.matrix = twgl.m4.scale(agent.matrix, cube_scale);
-
-      // Set the uniforms for the agent
-      let uniforms = {
-          u_matrix: agent.matrix,
-      }
-
-      // Set the uniforms and draw the agent
-      twgl.setUniforms(programInfo, uniforms);
-      twgl.drawBufferInfo(gl, agentsBufferInfo);
-      
-    }
+  gl.bindVertexArray(agentsVao);
+  
+  for(const agent of agents){
+    const cube_trans = twgl.v3.create(...agent.position);
+    const cube_scale = twgl.v3.create(...agent.scale);
+    
+    // Start with view projection matrix
+    agent.matrix = twgl.m4.translate(viewProjectionMatrix, cube_trans);
+    
+    // Apply Y-axis rotation based on heading
+    agent.matrix = twgl.m4.rotateY(agent.matrix, agent.heading);
+    
+    // Apply any additional rotations if needed
+    agent.matrix = twgl.m4.rotateX(agent.matrix, agent.rotation[0]);
+    agent.matrix = twgl.m4.rotateZ(agent.matrix, agent.rotation[2]);
+    
+    // Apply scale
+    agent.matrix = twgl.m4.scale(agent.matrix, cube_scale);
+    
+    let uniforms = {
+      u_matrix: agent.matrix,
+    };
+    
+    twgl.setUniforms(programInfo, uniforms);
+    twgl.drawBufferInfo(gl, agentsBufferInfo);
+  }
 }
 
 function drawTrafficLights(distance, trafficLightVAO, trafficLightBufferInfo, viewProjectionMatrix) {
@@ -470,38 +559,69 @@ function drawTrafficLights(distance, trafficLightVAO, trafficLightBufferInfo, vi
  * Draws the obstacles.
  * 
  * @param {Number} distance - The distance for rendering.
- * @param {WebGLVertexArrayObject} obstaclesVao - The vertex array object for obstacles.
- * @param {Object} obstaclesBufferInfo - The buffer information for obstacles.
+ * @param {WebGLVertexArrayObject} BuildingVAO - The vertex array object for obstacles.
+ * @param {Object} BuildingBuffer - The buffer information for obstacles.
  * @param {Float32Array} viewProjectionMatrix - The view-projection matrix.
  */
-function drawObstacles(distance, obstaclesVao, obstaclesBufferInfo, viewProjectionMatrix){
+function drawBuildings(distance, BuildingVAO, BuildingBuffer, viewProjectionMatrix){
     // Bind the vertex array object for obstacles
-    gl.bindVertexArray(obstaclesVao);
+    gl.bindVertexArray(BuildingVAO);
 
     // Iterate over the obstacles
-    for(const obstacle of obstacles){
+    for(const Building of Buildings){
       // Create the obstacle's transformation matrix
-      const cube_trans = twgl.v3.create(...obstacle.position);
-      const cube_scale = twgl.v3.create(...obstacle.scale);
+      const cube_trans = twgl.v3.create(...Building.position);
+      const cube_scale = twgl.v3.create(...Building.scale);
 
       // Calculate the obstacle's matrix
-      obstacle.matrix = twgl.m4.translate(viewProjectionMatrix, cube_trans);
-      obstacle.matrix = twgl.m4.rotateX(obstacle.matrix, obstacle.rotation[0]);
-      obstacle.matrix = twgl.m4.rotateY(obstacle.matrix, obstacle.rotation[1]);
-      obstacle.matrix = twgl.m4.rotateZ(obstacle.matrix, obstacle.rotation[2]);
-      obstacle.matrix = twgl.m4.scale(obstacle.matrix, cube_scale);
+      Building.matrix = twgl.m4.translate(viewProjectionMatrix, cube_trans);
+      Building.matrix = twgl.m4.rotateX(Building.matrix, Building.rotation[0]);
+      Building.matrix = twgl.m4.rotateY(Building.matrix, Building.rotation[1]);
+      Building.matrix = twgl.m4.rotateZ(Building.matrix, Building.rotation[2]);
+      Building.matrix = twgl.m4.scale(Building.matrix, cube_scale);
 
       // Set the uniforms for the obstacle
       let uniforms = {
-          u_matrix: obstacle.matrix,
+          u_matrix: Building.matrix,
       }
 
       // Set the uniforms and draw the obstacle
       twgl.setUniforms(programInfo, uniforms);
-      twgl.drawBufferInfo(gl, obstaclesBufferInfo);
+      twgl.drawBufferInfo(gl, BuildingBuffer);
       
     }
 }
+
+function drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix){
+  // Bind the vertex array object for obstacles
+  gl.bindVertexArray(RoadVAO);
+
+  // Iterate over the obstacles
+  for(const Road of Roads){
+    // Create the obstacle's transformation matrix
+    const Road_trans = twgl.v3.create(...Road.position);
+    const Road_scale = twgl.v3.create(...Road.scale);
+
+    // Calculate the obstacle's matrix
+    Road.matrix = twgl.m4.translate(viewProjectionMatrix, Road_trans);
+    Road.matrix = twgl.m4.rotateX(Road.matrix, Road.rotation[0]);
+    Road.matrix = twgl.m4.rotateY(Road.matrix,Road.rotation[1]);
+    Road.matrix = twgl.m4.rotateZ(Road.matrix, Road.rotation[2]);
+    Road.matrix = twgl.m4.scale(Road.matrix, Road_scale);
+
+    // Set the uniforms for the obstacle
+    let uniforms = {
+        u_matrix: Road.matrix,
+    }
+
+    // Set the uniforms and draw the obstacle
+    twgl.setUniforms(programInfo, uniforms);
+    twgl.drawBufferInfo(gl, RoadBuffer);
+    
+  }
+}
+
+
 
 /*
  * Sets up the world view by creating the view-projection matrix.
@@ -760,7 +880,7 @@ function generateObstacleData(size){
     };
     return arrays;
 }
-async function loadObj(route, shouldScaleSmall) {
+async function loadObj(route, shouldScaleSmall,type) {
   try {
       const response = await fetch(route);
       if (!response.ok) {
@@ -800,8 +920,10 @@ async function loadObj(route, shouldScaleSmall) {
                   const scaledVertex = vertex.map(coord => coord * scale);
 
                   structure.a_position.data.push(...scaledVertex);
-                  if(shouldScaleSmall){structure.a_color.data.push(1.0, 0.5, 0.0, 1.0);}
-                  else{structure.a_color.data.push(1.0, 0.0, 0.5, 1.0);}  // Fixed color for all vertices
+                  if(type=="Car"){structure.a_color.data.push(1.0, 0.5, 0.0, 1.0);}
+                  else if (type=="TrafficLight"){structure.a_color.data.push(1.0, 0.0, 0.5, 1.0);}
+                  else if (type=="Building"){structure.a_color.data.push(0.0, 0.5, 0.5, 1.0);}  // Fixed color for all vertices
+                  else if (type=="Road"){structure.a_color.data.push(1.0, 1.0, 1.0, 1.0);}  // Fixed color for all vertices
                   structure.a_normal.data.push(...normal);
               }
           }
@@ -813,6 +935,22 @@ async function loadObj(route, shouldScaleSmall) {
       console.error("Error loading OBJ file:", err);
   }
 }
+
+function calculateHeading(currentPos, previousPos) {
+  // Calculate direction vector
+  const dx = currentPos[0] - previousPos[0];
+  const dz = currentPos[2] - previousPos[2]; // Using z instead of y for ground plane
+  
+  // Calculate angle in radians
+  let angle = Math.atan2(dx, dz);
+  
+  // Only update heading if there's significant movement
+  if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
+    return angle;
+  }
+  return null; // Return null if there's no significant movement
+}
+
 
 
 
