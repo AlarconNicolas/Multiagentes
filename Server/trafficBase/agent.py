@@ -1,24 +1,27 @@
 from mesa import Agent
-from collections import defaultdict
 
 class Car(Agent):
     """
     Car agent that follows a calculated path to its destination while respecting traffic rules.
+    Includes lane-changing behavior to avoid traffic and ensures valid lane changes considering road direction.
     """
     def __init__(self, unique_id, model, destination):
         super().__init__(unique_id, model)
         self.destination = destination
         self.current_path = None
         self.path_index = 0
+        self.stuck_counter = 0  # Counter to track if the car is stuck
         self.recalculate_path()
 
     def recalculate_path(self):
         """
-        Calculates or recalculates the path to the destination.
+        Recalculates the path to the destination, adding random penalties to encourage route diversity.
         """
         if self.pos and self.destination:
-            self.current_path = self.model.find_path(self.pos, self.destination)
+            # Use a weighted pathfinding function with traffic-based penalties
+            self.current_path = self.model.find_path(self.pos, self.destination, avoid_traffic=True)
             self.path_index = 0
+            self.stuck_counter = 0  # Reset stuck counter
 
     def check_traffic_light(self, next_pos):
         """
@@ -29,7 +32,7 @@ class Car(Agent):
         for agent in next_cell_contents:
             if isinstance(agent, Traffic_Light):
                 return agent.state
-        return True
+        return True  # If no traffic light, proceed
 
     def check_for_obstacles(self, next_pos):
         """
@@ -38,7 +41,7 @@ class Car(Agent):
         """
         next_cell_contents = self.model.grid.get_cell_list_contents([next_pos])
         for agent in next_cell_contents:
-            if isinstance(agent, (Obstacle, Car)):
+            if isinstance(agent, (Obstacle, Car)):  # Obstacle or another car
                 return False
         return True
 
@@ -49,50 +52,95 @@ class Car(Agent):
         """
         if (not self.current_path or 
             self.path_index >= len(self.current_path) - 1):
-            return None
-            
+            return None  # No next position
         return self.current_path[self.path_index + 1]
+
+    def get_current_road(self):
+        """
+        Gets the road agent at the car's current position.
+        """
+        cell_contents = self.model.grid.get_cell_list_contents([self.pos])
+        for agent in cell_contents:
+            if isinstance(agent, Road):
+                return agent
+        return None
+
+    def change_lane(self):
+        """
+        Attempts to change lanes if the car is stuck.
+        Checks adjacent cells based on the current road direction.
+        """
+        current_road = self.get_current_road()
+        if not current_road:
+            return  # Can't find road at current position
+
+        direction = current_road.direction
+
+        # Define side offsets based on direction
+        side_offsets = {
+            'N': [(-1, 0), (1, 0)],  # Left: west, Right: east
+            'S': [(1, 0), (-1, 0)],  # Left: east, Right: west
+            'E': [(0, -1), (0, 1)],  # Left: north, Right: south
+            'W': [(0, 1), (0, -1)]   # Left: south, Right: north
+        }
+
+        if direction not in side_offsets:
+            return  # Unknown direction
+
+        for offset in side_offsets[direction]:
+            new_pos = (self.pos[0] + offset[0], self.pos[1] + offset[1])
+            # Check if new_pos is within the grid bounds
+            if not self.model.grid.out_of_bounds(new_pos):
+                # Check if there is a road at new_pos
+                cell_contents = self.model.grid.get_cell_list_contents([new_pos])
+                road_found = False
+                for agent in cell_contents:
+                    if isinstance(agent, Road):
+                        road_found = True
+                        new_road = agent
+                        break
+                if road_found:
+                    # Check if the new position is free of obstacles
+                    if self.check_for_obstacles(new_pos):
+                        # Move the car to the new position
+                        self.model.grid.move_agent(self, new_pos)
+                        self.stuck_counter = 0
+                        self.recalculate_path()
+                        return  # Successfully changed lanes
 
     def move(self):
         """
         Moves the car along its calculated path while respecting traffic rules.
+        Includes periodic path recalculation to avoid congestion.
         """
-        # Check if we've reached the destination
         if self.pos == self.destination:
             self.model.grid.remove_agent(self)
             self.model.schedule.remove(self)
-            self.model.reached_destination += 1
             self.model.in_grid -= 1
             return
 
-        # Get next position from path
         next_pos = self.get_next_position()
-        if not next_pos:
-            # If no next position, try to recalculate path
-            self.recalculate_path()
-            return
+        if not next_pos or not self.check_for_obstacles(next_pos):
+            self.stuck_counter += 1
+            if self.stuck_counter >= 3:  # Threshold for being stuck
+                self.change_lane()
+            else:
+                return
+        elif not self.check_traffic_light(next_pos):
+            # Can't move due to red light
+            self.stuck_counter += 1
+            if self.stuck_counter >= 3:
+                self.change_lane()
+            else:
+                return
+        else:
+            # Move to the next position
+            self.model.grid.move_agent(self, next_pos)
+            self.path_index += 1
+            self.stuck_counter = 0
 
-        # Check if next position is within grid bounds
-        if (not (0 <= next_pos[0] < self.model.grid.width and
-                0 <= next_pos[1] < self.model.grid.height)):
-            self.recalculate_path()
-            return
-
-        # Check for obstacles and traffic lights
-        if not self.check_for_obstacles(next_pos):
-            # If blocked by obstacle/car, wait
-            return
-
-        if not self.check_traffic_light(next_pos):
-            # If red light, wait
-            return
-
-        # Move to next position
-        self.model.grid.move_agent(self, next_pos)
-        self.path_index += 1
-
-        # If we've completed the current path segment
-        if self.path_index >= len(self.current_path) - 1:
+        # Recalculate path every 5 steps for diversity
+        if self.model.schedule.steps % 5 == 0:
             self.recalculate_path()
 
     def step(self):
@@ -109,19 +157,15 @@ class Car(Agent):
 
 class Traffic_Light(Agent):
     """
-    Traffic light agent that changes state (green or red) every few steps.
+    Traffic light agent controlled by the model's synchronized mechanism.
     """
-    def __init__(self, unique_id, model, state=False, timeToChange=10):
+    def __init__(self, unique_id, model, is_horizontal=False):
         super().__init__(unique_id, model)
-        self.state = state
-        self.timeToChange = timeToChange
-        
+        self.state = False  # Default to red
+        self.is_horizontal = is_horizontal  # True for horizontal (s), False for vertical (S)
+
     def step(self):
-        """
-        Changes the state of the traffic light (green or red) after a certain number of steps.
-        """
-        if self.model.schedule.steps % self.timeToChange == 0:
-            self.state = not self.state
+        pass  # Behavior controlled by CityModel
 
 class Road(Agent):
     """

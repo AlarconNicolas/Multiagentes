@@ -16,7 +16,7 @@ def agent_portrayal(agent):
     if isinstance(agent, Road):
         portrayal["Color"] = "grey"
         portrayal["Layer"] = 0
-    
+
     if isinstance(agent, Destination):
         portrayal["Color"] = "lightgreen"
         portrayal["Layer"] = 0
@@ -52,15 +52,14 @@ with open('../static/city_files/2022_base.txt') as baseFile:
 
 # Define model parameters with N as an IntSlider to allow dynamic input
 model_params = {
-    "N": Slider("Number of Cars", 5, 1, 1000, 1)  # Creates a slider to select number of cars
+    "N": Slider("Density of cars", 0.5, 0, 1, 0.05)
 }
 
 # Create a CanvasGrid for visualization
 grid = CanvasGrid(agent_portrayal, width, height, 500, 500)
 
 agent_count_chart = ChartModule(
-    [{"Label": "Cars in Grid", "Color": "blue"},
-     {"Label": "Cars Reached Destination", "Color": "green"}],
+    [{"Label": "Cars in Grid", "Color": "blue"}],
     data_collector_name="datacollector"
 )
 
