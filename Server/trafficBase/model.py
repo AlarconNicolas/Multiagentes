@@ -2,7 +2,7 @@ from mesa import Model
 from mesa.datacollection import DataCollector
 from mesa.time import RandomActivation
 from mesa.space import MultiGrid
-from agent import *
+from .agent import *
 import json
 import random
 import networkx as nx
@@ -22,14 +22,16 @@ class CityModel(Model):
         )
         
         # Load the map dictionary
-        dataDictionary = json.load(open("../static/city_files/mapDictionary.json"))
+
+        dataDictionary = json.load(open("./static/city_files/mapDictionary.json"))
+        self.traffic_lights = []
         self.traffic_lights_S = []
         self.traffic_lights_s = []
         self.destinations = []
         self.corner_positions = []
         
         # Load the map file and create graph
-        map_path = '../static/city_files/2022_base.txt'
+        map_path = './static/city_files/2022_base.txt'
         with open(map_path) as baseFile:
             lines = baseFile.readlines()
             self.width = len(lines[0])-1
@@ -42,6 +44,8 @@ class CityModel(Model):
                 for c, col in enumerate(row):
                     if col in ["v", "^", ">", "<"]:
                         agent = Road(f"r_{r*self.width+c}", self, dataDictionary[col])
+                        agent.direction=col
+                        print("The road directions is:", agent.direction)
                         self.grid.place_agent(agent, (c, self.height - r - 1))
                     elif col in ["S", "s"]:
                         is_horizontal = (col == "s")
