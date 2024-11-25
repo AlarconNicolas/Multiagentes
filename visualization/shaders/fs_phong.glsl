@@ -1,45 +1,56 @@
 #version 300 es
 precision highp float;
 
+// Varyings from the vertex shader
+in vec4 v_color;
 in vec3 v_normal;
-in vec3 v_cameraDirection;
-in vec3 v_lightDirection;
+in vec3 v_position;
 
+// Uniforms for lighting
+uniform vec3 u_lightWorldDirection; // Directional light direction
 uniform vec4 u_ambientLight;
 uniform vec4 u_diffuseLight;
 uniform vec4 u_specularLight;
 
+// Uniforms for material properties
 uniform vec4 u_ambientColor;
 uniform vec4 u_diffuseColor;
 uniform vec4 u_specularColor;
 uniform float u_shininess;
 
+// Uniform for camera position
+uniform vec3 u_viewWorldPosition;
+
+// Output color
 out vec4 outColor;
 
 void main() {
+    // Normalize the normal vector
+    vec3 normal = normalize(v_normal);
+    
+    // Normalize the light direction
+    vec3 lightDir = normalize(u_lightWorldDirection);
+    
+    // Calculate the view direction
+    vec3 viewDir = normalize(u_viewWorldPosition - v_position);
+    
+    // Calculate the reflection direction
+    vec3 reflectDir = reflect(-lightDir, normal);
+    
+    // Ambient component
     vec4 ambient = u_ambientLight * u_ambientColor;
-
+    
     // Diffuse component
-    // Normalize the vectors
-    vec3 normalVector = normalize(v_normal);
-    vec3 lightVector = normalize(v_lightDirection);
-    float lambert = dot(normalVector, lightVector);
-
-    vec4 diffuse = vec4(0, 0, 0, 1);
-    if (lambert > 0.0) {
-        diffuse = u_diffuseLight * u_diffuseColor * lambert;
-    }
-
+    float lambert = max(dot(normal, lightDir), 0.0);
+    vec4 diffuse = u_diffuseLight * u_diffuseColor * lambert;
+    
     // Specular component
-    vec3 reflectionVector = reflect(-lightVector, normalVector);
-    vec3 cameraVector = normalize(v_cameraDirection);
-    float specularFactor = pow(max(dot(reflectionVector, cameraVector), 0.0), u_shininess);
-
-    vec4 specular = vec4(0, 0, 0, 1);
+    float spec = 0.0;
     if (lambert > 0.0) {
-        specular = u_specularLight * u_specularColor * specularFactor;
+        spec = pow(max(dot(viewDir, reflectDir), 0.0), u_shininess);
     }
-
+    vec4 specular = u_specularLight * u_specularColor * spec;
+    
     // Combine all components
     outColor = ambient + diffuse + specular;
 }
