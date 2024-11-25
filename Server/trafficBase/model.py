@@ -41,6 +41,8 @@ class CityModel(Model):
                 for c, col in enumerate(row):
                     if col in ["v", "^", ">", "<"]:
                         agent = Road(f"r_{r*self.width+c}", self, dataDictionary[col])
+                        agent.direction=col
+                        print("The road directions is:", agent.direction)
                         self.grid.place_agent(agent, (c, self.height - r - 1))
                     elif col in ["S", "s"]:
                         agent = Traffic_Light(f"tl_{r*self.width+c}", self, False if col == "S" else True, int(dataDictionary[col]))
