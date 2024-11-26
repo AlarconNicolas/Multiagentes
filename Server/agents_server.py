@@ -131,7 +131,8 @@ def getLights():
                         "id": agent.unique_id,
                         "x": agent.pos[0],
                         "y": 2,
-                        "z": agent.pos[1]  # Using y coordinate as z for 3D
+                        "z": agent.pos[1],
+                        "state":agent.state  # Using y coordinate as z for 3D
                     })
             
             print(f"Found {len(light_positions)} Lights")

@@ -30,12 +30,13 @@ class Agent3D {
   }
 }
 class TrafficLight3D {
-  constructor(id, position=[1,1,3], rotation=[0,0,0], scale=[0.2,0.2,0.2]){
+  constructor(id, position=[1,1,3],state, rotation=[0,0,0], scale=[0.2,0.2,0.2]){
   this.id = id;
   this.position = position;
   this.rotation = rotation;
   this.scale = scale;
   this.matrix = twgl.m4.create();
+  this.state = state
   }
 }
 class Road3D {
@@ -68,7 +69,7 @@ let numberofcars=0;
 // Initialize the frame count
 let frameCount = 0;
 const data = {
-  NAgents: 10,
+  NAgents: 50,
   width: 35,
   height: 35
 };
@@ -343,7 +344,7 @@ async function getLights() {
 
       if (traficLights.length === 0) {
         for (const light of positions) {
-          const newLight = new TrafficLight3D(light.id, [light.x, light.y, light.z]);
+          const newLight = new TrafficLight3D(light.id, [light.x, light.y, light.z],light.state);
           traficLights.push(newLight);
         }
       } else {
@@ -351,6 +352,8 @@ async function getLights() {
           const existingLight = traficLights.find(t => t.id === light.id);
           if (existingLight) {
             existingLight.position = [light.x, light.y, light.z];
+            existingLight.state = light.state;
+            console.log("NEW LIGHT STATE:", existingLight.state)
           }
         }
       }
@@ -452,6 +455,7 @@ async function update() {
     if(response.ok){
       // Retrieve the updated agent positions
       await getAgents()
+      await getLights()
       // Log a message indicating that the agents have been updated
       console.log("Updated agents")
     }
@@ -573,6 +577,18 @@ function drawTrafficLights(distance, trafficLightVAO, trafficLightBufferInfo, vi
     
     // Compute the world inverse transpose matrix for normals
     const worldInverseTranspose = twgl.m4.transpose(twgl.m4.inverse(modelMatrix));
+
+    let color;
+    if (trafficLight.state) {
+      // Red state
+      color = [0.0, 1.0, 0.0, 1.0];
+    } else {
+      // Green state
+      color = [1.0, 0.0, 0.0, 1.0];
+    }
+    
+    // Optionally, add emissive color
+    let emissiveColor = color;
     
     // Set uniforms for this traffic light
     twgl.setUniforms(programInfo, {
@@ -581,6 +597,7 @@ function drawTrafficLights(distance, trafficLightVAO, trafficLightBufferInfo, vi
       u_ambientColor: [1.0, 0.0, 0.5, 1.0],  // Pink color
       u_diffuseColor: [1.0, 0.0, 0.5, 1.0],
       u_specularColor: [1.0, 0.0, 0.5, 1.0],
+      u_emissiveColor: emissiveColor,
     });
     
     // Draw the traffic light
@@ -626,6 +643,7 @@ function drawBuildings(distance, BuildingVAO, BuildingBuffer, viewProjectionMatr
       u_ambientColor: [0.0, 0.5, 0.5, 1.0],  // Teal color
       u_diffuseColor: [0.0, 0.5, 0.5, 1.0],
       u_specularColor: [0.0, 0.5, 0.5, 1.0],
+      u_emissiveColor: [0.0,0.0,0.0,1.0],
     });
     
     // Draw the building
@@ -669,6 +687,7 @@ function drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix){
       u_ambientColor: [0.3, 0.3, 0.3, 1.0],  // Dark gray color
       u_diffuseColor: [0.3, 0.3, 0.3, 1.0],
       u_specularColor: [0.3, 0.3, 0.3, 1.0],
+      u_emissiveColor: [0.0,0.0,0.0,1.0],
     });
     
     // Draw the road
@@ -744,7 +763,29 @@ function setupUI() {
   posFolder.add(cameraPosition, 'x', -50, 50).onChange(updateCameraPosition);
   posFolder.add(cameraPosition, 'y', -50, 50).onChange(updateCameraPosition);
   posFolder.add(cameraPosition, 'z', -50, 50).onChange(updateCameraPosition);
+
+  const lightingFolder = gui.addFolder('Lighting');
+
+  // Add color controls for light colors
+  lightingFolder.addColor(lighting, 'ambientLight').name('Ambient Light').onChange(updateLighting);
+  lightingFolder.addColor(lighting, 'diffuseLight').name('Diffuse Light').onChange(updateLighting);
+  lightingFolder.addColor(lighting, 'specularLight').name('Specular Light').onChange(updateLighting);
+
+  // Add color controls for material colors
+  lightingFolder.addColor(lighting, 'ambientColor').name('Ambient Color').onChange(updateLighting);
+  lightingFolder.addColor(lighting, 'diffuseColor').name('Diffuse Color').onChange(updateLighting);
+  lightingFolder.addColor(lighting, 'specularColor').name('Specular Color').onChange(updateLighting);
+
+  // Add control for shininess
+  lightingFolder.add(lighting, 'shininess', 0, 100).name('Shininess').onChange(updateLighting);
+
+  // Add controls for light direction
+  const lightDirFolder = lightingFolder.addFolder('Light Direction');
+  lightDirFolder.add(lighting.lightWorldDirection, 0, -1, 1).name('X').onChange(updateLighting);
+  lightDirFolder.add(lighting.lightWorldDirection, 1, -1, 1).name('Y').onChange(updateLighting);
+  lightDirFolder.add(lighting.lightWorldDirection, 2, -1, 1).name('Z').onChange(updateLighting);
 }
+
 
 function updateCameraPosition() {
   // Recalculate the viewProjectionMatrix
@@ -752,6 +793,10 @@ function updateCameraPosition() {
   // Update the camera position in the lighting object
   lighting.viewWorldPosition = [cameraPosition.x + data.width/2, cameraPosition.y, cameraPosition.z+data.height/2];
   // Do not set the uniform here; it will be set in drawScene()
+}
+function updateLighting() {
+  // Normalize the light direction vector
+  twgl.v3.normalize(lighting.lightWorldDirection, lighting.lightWorldDirection);
 }
 
 async function loadObj(route, shouldScaleSmall,type) {
