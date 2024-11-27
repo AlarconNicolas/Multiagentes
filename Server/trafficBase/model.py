@@ -2,20 +2,20 @@ from mesa import Model
 from mesa.datacollection import DataCollector
 from mesa.time import RandomActivation
 from mesa.space import MultiGrid
-from .agent import *  # Ensure your agent classes are correctly defined in this module
+from agent import *  # Ensure your agent classes are correctly defined in this module
 import json
 import random
 import networkx as nx
 
 class CityModel(Model):
-    def __init__(self,N):
+    def __init__(self, N):
         super().__init__()
         self.reached_destination = 0
         self.in_grid = 0
         self.corner_positions = []
         self.running = True
         self.step_count = 0
-        self.n=N
+        self.n = N
 
         # Initialize DataCollector
         self.datacollector = DataCollector(
@@ -26,7 +26,7 @@ class CityModel(Model):
         )
 
         # Load the map dictionary
-        with open("./static/city_files/mapDictionary.json") as f:
+        with open("../static/city_files/mapDictionary.json") as f:
             dataDictionary = json.load(f)
 
         self.traffic_lights_S = []
@@ -41,8 +41,12 @@ class CityModel(Model):
             'v': (0, -1),   # Down
         }
 
+        # Initialize an array to store traffic light directions
+        # Each entry will be a dictionary with traffic light ID, position, and directions
+        self.traffic_light_directions = []
+
         # Load the map file and create graph
-        map_path = './static/city_files/2024_base.txt'
+        map_path = '../static/city_files/2024_base.txt'
         with open(map_path) as baseFile:
             lines = baseFile.readlines()
             self.width = len(lines[0].strip())
@@ -54,25 +58,33 @@ class CityModel(Model):
             for r, row in enumerate(lines):
                 for c, col in enumerate(row.strip('\n')):
                     pos = (c, self.height - r - 1)  # Align Y-axis correctly
-                    unique_id = f"{col}_{r*self.width+c}"
+                    unique_id = f"{col}_{r*self.width + c}"
                     if col in self.arrow_orientations:
                         direction = tuple(self.arrow_orientations[col])
-                        agent = Road(f"r_{r*self.width+c}", self, direction)
+                        agent = Road(f"r_{r*self.width + c}", self, direction)
                         self.grid.place_agent(agent, pos)
                     elif col in ["S", "s"]:
                         is_horizontal = (col == "s")
-                        agent = Traffic_Light(f"tl_{r*self.width+c}", self, is_horizontal=is_horizontal)
+                        agent = Traffic_Light(f"tl_{r*self.width + c}", self, is_horizontal=is_horizontal)
                         self.grid.place_agent(agent, pos)
                         self.schedule.add(agent)
                         if col == "S":
                             self.traffic_lights_S.append(agent)
                         else:
                             self.traffic_lights_s.append(agent)
+                        
+                        # Determine the directions this traffic light controls
+                        directions = self.get_traffic_light_directions(col)
+                        self.traffic_light_directions.append({
+                            "id": agent.unique_id,
+                            "position": pos,
+                            "directions": directions
+                        })
                     elif col == "#":
-                        agent = Obstacle(f"ob_{r*self.width+c}", self)
+                        agent = Obstacle(f"ob_{r*self.width + c}", self)
                         self.grid.place_agent(agent, pos)
                     elif col == "D":
-                        agent = Destination(f"d_{r*self.width+c}", self)
+                        agent = Destination(f"d_{r*self.width + c}", self)
                         self.grid.place_agent(agent, pos)
                         self.destinations.append(pos)
 
@@ -91,6 +103,23 @@ class CityModel(Model):
         self.running = True
         self.light_timer = 0  
         self.light_cycle_duration = 7  
+
+        print("Traffic Light Directions Array:")
+        for tl_info in self.traffic_light_directions:
+            print(f"ID: {tl_info['id']}, Position: {tl_info['position']}, Directions: {tl_info['directions']}")
+
+    def get_traffic_light_directions(self, light_type):
+        """
+        Determines the controlled directions based on the traffic light type.
+        'S' controls vertical (North-South) directions.
+        's' controls horizontal (East-West) directions.
+        """
+        if light_type == "S":
+            return ["North", "South"]
+        elif light_type == "s":
+            return ["East", "West"]
+        else:
+            return []
 
     def get_lateral_moves(self, direction):
         """Returns the lateral movement directions based on the forward direction."""
@@ -306,6 +335,7 @@ class CityModel(Model):
     def step(self):
         """Advance the model by one step and try to spawn new cars."""
         self.step_count += 1  # Increment step counter
+        self.schedule.step()
 
         # Toggle synchronized traffic lights
         self.toggle_traffic_lights()
@@ -319,6 +349,3 @@ class CityModel(Model):
 
         # Collect data
         self.datacollector.collect(self)
-
-        # Agents take their steps
-        self.schedule.step()
