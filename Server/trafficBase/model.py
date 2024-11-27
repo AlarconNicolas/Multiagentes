@@ -6,17 +6,16 @@ from .agent import *  # Ensure your agent classes are correctly defined in this 
 import json
 import random
 import networkx as nx
-import logging
 
 class CityModel(Model):
-    def __init__(self, N):
+    def __init__(self,N):
         super().__init__()
         self.reached_destination = 0
         self.in_grid = 0
         self.corner_positions = []
         self.running = True
         self.step_count = 0
-        self.n = N
+        self.n=N
 
         # Initialize DataCollector
         self.datacollector = DataCollector(
@@ -87,7 +86,6 @@ class CityModel(Model):
             (self.width - 1, 0),             # Bottom-right corner
             (self.width - 1, self.height - 1)  # Top-right corner
         ]
-
 
         self.car_id_counter = 0
         self.running = True
@@ -200,27 +198,31 @@ class CityModel(Model):
                     if self.is_valid_movement(cell, next_cell, dx, dy):
                         city_graph.add_edge(pos, next_pos)
 
-        logging.info("City navigation graph created.")
         return city_graph
 
     def find_path(self, start_pos, end_pos, avoid_traffic=True):
         """
         Finds the shortest path between two positions using Dijkstra's algorithm.
-        Excludes corner positions from the path unless the start position is a corner.
+        Excludes corner positions and other destination cells from the path unless the start position is a corner.
         """
         try:
-            # Determine which nodes to include in the subgraph
+            # Start with all nodes in the navigation graph
+            allowed_nodes = set(self.navigation_graph.nodes)
+
+            # Exclude corner positions unless it's the start position
             if start_pos in self.corner_positions:
-                # If starting at a corner, allow the start_pos but exclude others
-                allowed_nodes = set(self.navigation_graph.nodes) - set(self.corner_positions)
-                allowed_nodes.add(start_pos)
+                allowed_nodes -= set(self.corner_positions)  # Remove all corners
+                allowed_nodes.add(start_pos)  # Re-add the start corner
             else:
-                # Exclude all corner positions
-                allowed_nodes = set(self.navigation_graph.nodes) - set(self.corner_positions)
-            
-            # Create a temporary subgraph without the excluded nodes
+                allowed_nodes -= set(self.corner_positions)  # Remove all corners
+
+            # Exclude all destination cells except the end_pos
+            other_destinations = set(self.destinations) - {end_pos}
+            allowed_nodes -= other_destinations  # Treat other destinations as obstacles
+
+            # Create a subgraph with the allowed nodes
             temp_graph = self.navigation_graph.subgraph(allowed_nodes)
-        
+
             if avoid_traffic:
                 def weight(u, v, d):
                     """
@@ -229,21 +231,21 @@ class CityModel(Model):
                     """
                     # Base weight
                     w = 1
-        
+
                     # Check if the target position v is occupied by a Car or an Obstacle
                     cell_contents = self.grid.get_cell_list_contents([v])
                     if any(isinstance(agent, (Car, Obstacle)) for agent in cell_contents):
                         return float('inf')  # Block this edge
-        
+
                     # Check if there's a traffic light at position v
                     for agent in cell_contents:
                         if isinstance(agent, Traffic_Light):
                             if not agent.state:
                                 # Traffic light is red; add penalty
                                 w += 10  # Penalty for red light
-        
+
                     return w
-        
+
                 # Use Dijkstra's algorithm with the custom weight function on the temporary graph
                 path = nx.dijkstra_path(temp_graph, start_pos, end_pos, weight=weight)
                 return path
@@ -252,9 +254,7 @@ class CityModel(Model):
                 path = nx.shortest_path(temp_graph, start_pos, end_pos)
                 return path
         except nx.NetworkXNoPath:
-            logging.warning(f"No path found from {start_pos} to {end_pos}.")
             return None  # No path found
-
 
     def try_spawn_car(self):
         """
@@ -306,7 +306,7 @@ class CityModel(Model):
     def step(self):
         """Advance the model by one step and try to spawn new cars."""
         self.step_count += 1  # Increment step counter
-        self.schedule.step()
+
         # Toggle synchronized traffic lights
         self.toggle_traffic_lights()
 
@@ -316,7 +316,9 @@ class CityModel(Model):
         if cars_spawned is not None:
             if cars_spawned <= 0:
                 self.running = False
-       
 
-        # Collect data and advance the schedule
+        # Collect data
         self.datacollector.collect(self)
+
+        # Agents take their steps
+        self.schedule.step()

@@ -40,7 +40,7 @@ class TrafficLight3D {
   }
 }
 class Road3D {
-  constructor(id, position=[1,1,3],direction, rotation=[0,0,0], scale=[0.5,0.5,0.5]){
+  constructor(id, position=[1,1,3],direction, rotation=[0,0,0], scale=[0.3,0.5,0.7]){
   this.id = id;
   this.position = position;
   this.rotation = rotation;
@@ -71,8 +71,8 @@ let numberofcars=0;
 let frameCount = 0;
 const data = {
   NAgents: 50,
-  width: 24,
-  height: 25
+  width: 29,
+  height: 30
 };
 const lighting = {
   ambientLight: [0.2, 0.2, 0.2, 1.0],    // Ambient light color
@@ -260,7 +260,7 @@ async function main() {
   const obj5 = await loadObj('./Figures/Building.obj',false,"Building");
   objcetsBuilding.model.arrays = obj5;
 
-  const obj6 = await loadObj('./Figures/Road2.obj',false,"Road");
+  const obj6 = await loadObj('./Figures/Road3.obj',false,"Road");
   objcetsRoads.model.arrays = obj6;
   
   const obj7 = await loadObj('./Figures/Subterra2.obj',false,"Road");
@@ -712,10 +712,13 @@ function drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix){
     const scale = twgl.v3.create(...Road.scale);
     
     // Adjust rotation based on direction
-    if(Road.direction === "^" || Road.direction === "v"){
-      Road.rotation[1] = Math.PI / 2; // 90 degrees in radians
-    } else {
+    if (
+      (Road.direction[0] === 0 && Road.direction[1] === 1) ||  // Matches (0, 1)
+      (Road.direction[0] === 0 && Road.direction[1] === -1)   // Matches (0, -1)
+    ) {
       Road.rotation[1] = 0;
+    } else {
+      Road.rotation[1] = Math.PI / 2; // 90 degrees in radians
     }
     
     // Create model matrix
@@ -751,7 +754,7 @@ function drawSubterra(distance, SubterraVAO, SubterraBuffer, viewProjectionMatri
   gl.bindVertexArray(SubterraVAO);
 
   // Position the subterra at the center of the map and slightly below other objects
-  const translation = twgl.v3.create(data.width / 2, -0.1, data.height / 2);
+  const translation = twgl.v3.create(data.width / 2, 0.5, data.height / 2);
 
   // Scale the subterra to cover the entire map area
   const scale = twgl.v3.create(data.width, 1, data.height);
