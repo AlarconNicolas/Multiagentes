@@ -2,7 +2,7 @@ from mesa import Model
 from mesa.datacollection import DataCollector
 from mesa.time import RandomActivation
 from mesa.space import MultiGrid
-from agent import *  # Ensure your agent classes are correctly defined in this module
+from .agent import *  # Ensure your agent classes are correctly defined in this module
 import json
 import random
 import networkx as nx
@@ -26,7 +26,7 @@ class CityModel(Model):
         )
 
         # Load the map dictionary
-        with open("../static/city_files/mapDictionary.json") as f:
+        with open("./static/city_files/mapDictionary.json") as f:
             dataDictionary = json.load(f)
 
         self.traffic_lights_S = []
@@ -46,7 +46,7 @@ class CityModel(Model):
         self.traffic_light_directions = []
 
         # Load the map file and create graph
-        map_path = '../static/city_files/2024_base.txt'
+        map_path = './static/city_files/2024_base.txt'
         with open(map_path) as baseFile:
             lines = baseFile.readlines()
             self.width = len(lines[0].strip())
@@ -346,6 +346,16 @@ class CityModel(Model):
         if cars_spawned is not None:
             if cars_spawned <= 0:
                 self.running = False
+                print("SIMULATION ENDED")
+        if not self.running:
+            cars = [agent for agent in self.schedule.agents if isinstance(agent, Car)]
+            for car in cars:
+                # Remove the car from the grid
+                self.grid.remove_agent(car)
+                # Remove the car from the scheduler
+                self.schedule.remove(car)
+                # Update the count of cars in the grid
+                self.in_grid -= 1
 
         # Collect data
         self.datacollector.collect(self)
