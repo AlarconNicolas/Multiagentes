@@ -60,8 +60,9 @@ const Buildings = [];
 const traficLights= [];
 const Roads=[];
 const Destinations=[];
+const MAX_LIGHTS = 24;
 // Initialize WebGL-related variables
-let gl, programInfo, agentArrays, agentsBufferInfo, agentsVao, BuildingVAO,wheelVAO,wheelBufferInfo,TrafficLightArrays,TrafficLightBuffer,TrafficLightVAO,BuildingBuffer,RoadBuffer,RoadVAO;
+let gl, programInfo, agentArrays, agentsBufferInfo, agentsVao, BuildingVAO,wheelVAO,wheelBufferInfo,TrafficLightArrays,TrafficLightBuffer,TrafficLightVAO,BuildingBuffer,RoadBuffer,RoadVAO,SubterraBuffer,SubterraVAO;
 
 // Define the camera position
 let cameraPosition = {x:0, y:9, z:9};
@@ -70,8 +71,8 @@ let numberofcars=0;
 let frameCount = 0;
 const data = {
   NAgents: 50,
-  width: 35,
-  height: 35
+  width: 24,
+  height: 25
 };
 const lighting = {
   ambientLight: [0.2, 0.2, 0.2, 1.0],    // Ambient light color
@@ -85,6 +86,12 @@ const lighting = {
   
   lightWorldDirection: [0.5, 1.0, 0.5], // Directional light direction
   viewWorldPosition: [cameraPosition.x + data.width/2, cameraPosition.y, cameraPosition.z + data.height/2], // Camera position
+  
+  numTrafficLights: 0,
+  trafficLightPositions: new Float32Array(MAX_LIGHTS * 3),
+  trafficLightColors: new Float32Array(MAX_LIGHTS * 3),
+  trafficLightDirections: new Float32Array(MAX_LIGHTS * 3),
+  trafficLightCutoffs: new Float32Array(MAX_LIGHTS),
 };
 
 // Define the data object
@@ -204,6 +211,35 @@ const objcetsRoads= {
       vao: undefined,
   }
 }
+const objcetsRoads1= {
+  model: {
+      transforms: {
+          // Translation
+          t: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Rotation in degrees
+          rd: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Rotation in radians
+          rr: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Scale
+          s: {
+              x: 1,
+              y: -1,
+              z: 1},
+      },
+      arrays: undefined,
+      bufferInfo: undefined,
+      vao: undefined,
+  }
+}
 // Main function to initialize and run the application
 async function main() {
   const canvas = document.querySelector('canvas');
@@ -227,6 +263,8 @@ async function main() {
   const obj6 = await loadObj('./Figures/Road2.obj',false,"Road");
   objcetsRoads.model.arrays = obj6;
   
+  const obj7 = await loadObj('./Figures/Subterra2.obj',false,"Road");
+  objcetsRoads1.model.arrays = obj7;
   
   console.log("LightArray",objcetsTrafficLight.model.arrays )
   console.log("Car ARRAY:", objcetsCar.model.arrays);
@@ -242,6 +280,7 @@ async function main() {
   TrafficLightBuffer = twgl.createBufferInfoFromArrays(gl, objcetsTrafficLight.model.arrays);
   BuildingBuffer = twgl.createBufferInfoFromArrays(gl, objcetsBuilding.model.arrays);
   RoadBuffer = twgl.createBufferInfoFromArrays(gl, objcetsRoads.model.arrays);
+  SubterraBuffer = twgl.createBufferInfoFromArrays(gl, objcetsRoads1.model.arrays);
   //BuildingBuffer = twgl.createBufferInfoFromArrays(gl, obstacleArrays);
   
   // Create VAOs
@@ -250,6 +289,7 @@ async function main() {
   TrafficLightVAO = twgl.createVAOFromBufferInfo(gl, programInfo, TrafficLightBuffer);
   BuildingVAO = twgl.createVAOFromBufferInfo(gl, programInfo, BuildingBuffer);
   RoadVAO = twgl.createVAOFromBufferInfo(gl, programInfo, RoadBuffer);
+  SubterraVAO = twgl.createVAOFromBufferInfo(gl, programInfo, SubterraBuffer);
   //BuildingVAO = twgl.createVAOFromBufferInfo(gl, programInfo, BuildingBuffer);
   
   setupUI();
@@ -262,7 +302,7 @@ async function main() {
 
   setLightingUniforms();
   // Pass parameters in the correct order
-  await drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer, TrafficLightBuffer, TrafficLightVAO,RoadVAO,RoadBuffer);
+  await drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer, TrafficLightBuffer, TrafficLightVAO,RoadVAO,RoadBuffer,SubterraVAO,SubterraBuffer);
 }
 
 
@@ -476,7 +516,7 @@ async function update() {
  * @param {WebGLVertexArrayObject} BuildingVAO - The vertex array object for obstacles.
  * @param {Object} BuildingBuffer - The buffer information for obstacles.
  */
-async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer,TrafficLightBuffer,TrafficLightVAO,RoadVAO,RoadBuffer) {
+async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer,TrafficLightBuffer,TrafficLightVAO,RoadVAO,RoadBuffer,SubterraVAO,SubterraBuffer) {
   twgl.resizeCanvasToDisplaySize(gl.canvas);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl.clearColor(0.2, 0.2, 0.2, 1);
@@ -484,13 +524,20 @@ async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.useProgram(programInfo.program);
   setLightingUniforms();
+  updateTrafficLightUniforms();
   twgl.setUniforms(programInfo, {
     u_viewWorldPosition: lighting.viewWorldPosition,
+    u_numTrafficLights: lighting.numTrafficLights,
+    u_trafficLightPositions: lighting.trafficLightPositions,
+    u_trafficLightColors: lighting.trafficLightColors,
+    u_trafficLightDirections: lighting.trafficLightDirections,
+    u_trafficLightCutoffs: lighting.trafficLightCutoffs,
   });
   const viewProjectionMatrix = setupWorldView(gl);
   const distance = 1;
 
   // Pass wheelVAO and wheelBufferInfo instead of agentsVao and agentsBufferInfo
+  drawSubterra(distance, SubterraVAO, SubterraBuffer, viewProjectionMatrix);
   drawAgents(distance, wheelVAO, wheelBufferInfo, viewProjectionMatrix); 
   drawTrafficLights(distance, TrafficLightVAO, TrafficLightBuffer, viewProjectionMatrix); 
   drawBuildings(distance, BuildingVAO, BuildingBuffer, viewProjectionMatrix);
@@ -503,7 +550,9 @@ async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO
       await update();
   }
 
-  requestAnimationFrame(() => drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer,TrafficLightBuffer,TrafficLightVAO,RoadVAO,RoadBuffer));
+  // In your drawScene function, ensure all parameters are passed in the recursive call
+requestAnimationFrame(() => drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer, TrafficLightBuffer, TrafficLightVAO, RoadVAO, RoadBuffer, SubterraVAO, SubterraBuffer));
+
 }
 
 
@@ -543,6 +592,7 @@ function drawAgents(distance, agentsVao, agentsBufferInfo, viewProjectionMatrix)
     
     // Set uniforms for this agent
     twgl.setUniforms(programInfo, {
+      u_world: modelMatrix,
       u_matrix: mvpMatrix,
       u_worldInverseTranspose: worldInverseTranspose,
       u_ambientColor: [1.0, 0.5, 0.0, 1.0],  // Orange color
@@ -592,6 +642,7 @@ function drawTrafficLights(distance, trafficLightVAO, trafficLightBufferInfo, vi
     
     // Set uniforms for this traffic light
     twgl.setUniforms(programInfo, {
+      u_world: modelMatrix,
       u_matrix: mvpMatrix,
       u_worldInverseTranspose: worldInverseTranspose,
       u_ambientColor: [1.0, 0.0, 0.5, 1.0],  // Pink color
@@ -638,6 +689,7 @@ function drawBuildings(distance, BuildingVAO, BuildingBuffer, viewProjectionMatr
     
     // Set uniforms for this building
     twgl.setUniforms(programInfo, {
+      u_world: modelMatrix,
       u_matrix: mvpMatrix,
       u_worldInverseTranspose: worldInverseTranspose,
       u_ambientColor: [0.0, 0.5, 0.5, 1.0],  // Teal color
@@ -682,11 +734,12 @@ function drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix){
     
     // Set uniforms for this road
     twgl.setUniforms(programInfo, {
+      u_world: modelMatrix,
       u_matrix: mvpMatrix,
       u_worldInverseTranspose: worldInverseTranspose,
-      u_ambientColor: [0.3, 0.3, 0.3, 1.0],  // Dark gray color
-      u_diffuseColor: [0.3, 0.3, 0.3, 1.0],
-      u_specularColor: [0.3, 0.3, 0.3, 1.0],
+      u_ambientColor: [1.0, 1.0, , 1.0],  // Dark gray color
+      u_diffuseColor: [1.0, 1.0, , 1.0],
+      u_specularColor: [1.0, 1.0, , 1.0],
       u_emissiveColor: [0.0,0.0,0.0,1.0],
     });
     
@@ -694,6 +747,39 @@ function drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix){
     twgl.drawBufferInfo(gl, RoadBuffer);
   });
 }
+function drawSubterra(distance, SubterraVAO, SubterraBuffer, viewProjectionMatrix) {
+  gl.bindVertexArray(SubterraVAO);
+
+  // Position the subterra at the center of the map and slightly below other objects
+  const translation = twgl.v3.create(data.width / 2, -0.1, data.height / 2);
+
+  // Scale the subterra to cover the entire map area
+  const scale = twgl.v3.create(data.width, 1, data.height);
+
+  // Create the model matrix
+  let modelMatrix = twgl.m4.identity();
+  modelMatrix = twgl.m4.translate(modelMatrix, translation);
+  modelMatrix = twgl.m4.scale(modelMatrix, scale);
+
+  // Compute matrices
+  const mvpMatrix = twgl.m4.multiply(viewProjectionMatrix, modelMatrix);
+  const worldInverseTranspose = twgl.m4.transpose(twgl.m4.inverse(modelMatrix));
+
+  // Set uniforms
+  twgl.setUniforms(programInfo, {
+    u_world: modelMatrix,
+    u_matrix: mvpMatrix,
+    u_worldInverseTranspose: worldInverseTranspose,
+    u_ambientColor: [0.5, 0.5, 0.5, 1.0], 
+    u_diffuseColor: [0.5, 0.5, 0.5, 1.0],
+    u_specularColor: [0.5, 0.5, 0.5, 1.0],  // Slight specular highlight
+    u_emissiveColor: [0.0, 0.0, 0.0, 1.0],
+  });
+
+  // Draw the subterra
+  twgl.drawBufferInfo(gl, SubterraBuffer);
+}
+
 
 
 function setLightingUniforms() {
@@ -798,7 +884,19 @@ function updateLighting() {
   // Normalize the light direction vector
   twgl.v3.normalize(lighting.lightWorldDirection, lighting.lightWorldDirection);
 }
+function updateTrafficLightUniforms() {
+  lighting.numTrafficLights = Math.min(traficLights.length, MAX_LIGHTS);
+  for (let i = 0; i < lighting.numTrafficLights; i++) {
+      const trafficLight = traficLights[i];
+      const pos = trafficLight.position; 
+      const color = trafficLight.state ? [0.0, 1.0, 0.0] : [1.0, 0.0, 0.0];
 
+      lighting.trafficLightPositions.set(pos, i * 3);
+      lighting.trafficLightColors.set(color, i * 3);
+      lighting.trafficLightDirections.set([0, -1, 0], i * 3); 
+      lighting.trafficLightCutoffs[i] = Math.cos(30 * Math.PI / 180); 
+  }
+}
 async function loadObj(route, shouldScaleSmall,type) {
   try {
       const response = await fetch(route);
@@ -839,10 +937,10 @@ async function loadObj(route, shouldScaleSmall,type) {
                   const scaledVertex = vertex.map(coord => coord * scale);
 
                   structure.a_position.data.push(...scaledVertex);
-                  if(type=="Car"){structure.a_color.data.push(1.0, 0.5, 0.0, 1.0);}
-                  else if (type=="TrafficLight"){structure.a_color.data.push(1.0, 0.0, 0.5, 1.0);}
-                  else if (type=="Building"){structure.a_color.data.push(0.0, 0.5, 0.5, 1.0);}  // Fixed color for all vertices
-                  else if (type=="Road"){structure.a_color.data.push(1.0, 1.0, 1.0, 1.0);}  // Fixed color for all vertices
+                  if(type=="Car"){structure.a_color.data.push(0.0, 0.0, 0.0, 1.0);}
+                  else if (type=="TrafficLight"){structure.a_color.data.push(0.0, 0.0, 0.0, 1.0);}
+                  else if (type=="Building"){structure.a_color.data.push(0.0, 0.0, 0.0, 1.0);}  // Fixed color for all vertices
+                  else if (type=="Road"){structure.a_color.data.push(0.0, 0.0, 0.0, 1.0);}  // Fixed color for all vertices
                   structure.a_normal.data.push(...normal);
               }
           }

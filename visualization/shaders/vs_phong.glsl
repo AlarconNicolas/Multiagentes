@@ -8,6 +8,7 @@ in vec3 a_normal;
 
 // Uniforms
 uniform mat4 u_matrix;
+uniform mat4 u_world;               // Added model matrix uniform
 uniform mat4 u_worldInverseTranspose;
 
 // Varyings to pass to fragment shader
@@ -21,5 +22,5 @@ void main() {
     // Transform the normal to world space
     v_normal = mat3(u_worldInverseTranspose) * a_normal;
     // Calculate world position of the vertex
-    v_position = (u_matrix * a_position).xyz;
+    v_position = (u_world * a_position).xyz;   // Updated to use u_world
 }
