@@ -64,7 +64,7 @@ def getAgents():
                         car_positions.append({
                             "id": agent.unique_id,
                             "x": agent.pos[0],
-                            "y": 1,
+                            "y": 0.7,
                             "z": agent.pos[1]  # Using y coordinate as z for 3D
                         })
             
@@ -167,7 +167,7 @@ def getRoads():
                         Roads_positions.append({
                             "id": agent.unique_id,
                             "x": agent.pos[0],
-                            "y": 1,
+                            "y": 0.6,
                             "z": agent.pos[1],
                             "direction": agent.direction  # Using y coordinate as z for 3D
                         })
