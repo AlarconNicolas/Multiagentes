@@ -18,17 +18,22 @@ class Building3D {
   }
 }
 class Agent3D {
-  constructor(id, position=[0,0,0], rotation=[0,0,0], scale=[1,1,1]){
-  this.id = id;
-  this.position = position;
-  this.rotation = rotation;
-  this.scale = scale;
-  this.matrix = twgl.m4.create();
-  this.previousPosition = position; // Store previous position to calculate direction
-  this.heading = 0;
-  this.isAtDestination=false;
+  constructor(id, position = [0, 0, 0], rotation = [0, 0, 0], scale = [1, 1, 1]) {
+    this.id = id;
+    this.position = position;
+    this.currentPosition = [...position];      // Current interpolated position
+    this.previousPosition = [...position];     // Position at last server update
+    this.targetPosition = [...position];       // New position from server
+    this.rotation = rotation;
+    this.scale = scale;
+    this.matrix = twgl.m4.create();
+    this.heading = 0;
+    this.isAtDestination = false;
+    this.lastUpdateTime = performance.now();
+    this.updateInterval = 100; // Time between updates in ms
   }
 }
+
 class TrafficLight3D {
   constructor(id, position=[1,1,3],state, rotation=[0,0,0], scale=[0.2,0.2,0.2]){
   this.id = id;
@@ -61,6 +66,9 @@ const traficLights= [];
 const Roads=[];
 const Destinations=[];
 const MAX_LIGHTS = 24;
+
+const updateInterval = 100; // milliseconds
+let lastUpdateTime = performance.now();
 // Initialize WebGL-related variables
 let gl, programInfo, agentArrays, agentsBufferInfo, agentsVao, BuildingVAO,wheelVAO,wheelBufferInfo,TrafficLightArrays,TrafficLightBuffer,TrafficLightVAO,BuildingBuffer,RoadBuffer,RoadVAO,SubterraBuffer,SubterraVAO;
 
@@ -340,36 +348,32 @@ async function getAgents() {
     let response = await fetch(agent_server_uri + "getAgents");
     if (response.ok) {
       let result = await response.json();
-      console.log("Result:", result.positions);
 
-      for (const agent of result.positions) {
-        // Check if the agent already exists
-        const current_agent = agents.find((existingAgent) => existingAgent.id === agent.id);
+      for (const agentData of result.positions) {
+        let agent = agents.find(a => a.id === agentData.id);
 
-        if (current_agent) {
+        if (agent) {
           // Update existing agent
-          current_agent.previousPosition = [...current_agent.position];
-          current_agent.position = [agent.x, agent.y, agent.z];
-
-          // Calculate new heading
-          const newHeading = calculateHeading(current_agent.position, current_agent.previousPosition);
-          if (newHeading !== null) {
-            current_agent.heading = newHeading;
+          if (!agent.currentPosition) {
+            agent.currentPosition = [...agent.previousPosition];
           }
+          agent.previousPosition = [...agent.currentPosition];
+          agent.targetPosition = [agentData.x, agentData.y, agentData.z];
+          agent.lastUpdateTime = performance.now();
         } else {
           // Add new agent
-          numberofcars += 1;
-          console.log("New agent added:", numberofcars);
-          const newAgent = new Agent3D(agent.id, [agent.x, agent.y, agent.z]);
+          const newAgent = new Agent3D(agentData.id, [agentData.x, agentData.y, agentData.z]);
           agents.push(newAgent);
         }
       }
-      console.log("Updated AGENTS SIZE:", agents.length);
     }
   } catch (error) {
     console.log("Error fetching agents:", error);
   }
 }
+
+
+
 
 
 async function getLights() {
@@ -488,23 +492,19 @@ async function getDestinations() {
  */
 async function update() {
   try {
-    // Send a request to the agent server to update the agent positions
-    let response = await fetch(agent_server_uri + "update") 
+    let response = await fetch(agent_server_uri + "update");
 
-    // Check if the response was successful
-    if(response.ok){
+    if (response.ok) {
       // Retrieve the updated agent positions
-      await getAgents()
-      await getLights()
-      // Log a message indicating that the agents have been updated
-      console.log("Updated agents")
+      await getAgents();
+      await getLights();
+      console.log("Updated agents");
     }
-
   } catch (error) {
-    // Log any errors that occur during the request
-    console.log(error) 
+    console.log(error);
   }
 }
+
 
 /*
  * Draws the scene by rendering the agents and obstacles.
@@ -543,11 +543,10 @@ async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO
   drawBuildings(distance, BuildingVAO, BuildingBuffer, viewProjectionMatrix);
   drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix);
 
-  frameCount++;
-
-  if(frameCount%30 == 0){
-      frameCount = 0;
-      await update();
+  const currentTime = performance.now();
+  if (currentTime - lastUpdateTime >= updateInterval) {
+    lastUpdateTime = currentTime;
+    await update();
   }
 
   // In your drawScene function, ensure all parameters are passed in the recursive call
@@ -566,44 +565,67 @@ requestAnimationFrame(() => drawScene(gl, programInfo, wheelBufferInfo, wheelVAO
  */
 function drawAgents(distance, agentsVao, agentsBufferInfo, viewProjectionMatrix) {
   gl.bindVertexArray(agentsVao);
-  const activeAgents = agents.filter(agent => !agent.isAtDestination);
-  
-  for(const agent of agents){
-    
-    if(isAtDestination(agent.position,Destinations)){
-      agent.isAtDestination=true;
-      continue;
+
+  const currentTime = performance.now();
+
+  for (const agent of agents) {
+    if (agent.isAtDestination) continue; // Skip agents that have reached their destination
+
+    const timeSinceLastUpdate = currentTime - agent.lastUpdateTime;
+    const t = Math.min(timeSinceLastUpdate / agent.updateInterval, 1); // Clamp t between 0 and 1
+
+    // Interpolate position
+    const interpolatedPosition = [
+      lerp(agent.previousPosition[0], agent.targetPosition[0], t),
+      lerp(agent.previousPosition[1], agent.targetPosition[1], t),
+      lerp(agent.previousPosition[2], agent.targetPosition[2], t),
+    ];
+
+    // Update the current position for the next frame
+    agent.currentPosition = [...interpolatedPosition];
+
+    // **Add this check to update isAtDestination**
+    if (isAtDestination(agent.currentPosition, Destinations)) {
+      agent.isAtDestination = true;
+      console.log(`Agent ${agent.id} has reached its destination and will be removed.`);
+      continue; // Skip rendering this agent
     }
-    const translation = twgl.v3.create(...agent.position);
+
+    // Calculate heading based on movement direction
+    const movementDirection = [
+      agent.targetPosition[0] - agent.previousPosition[0],
+      agent.targetPosition[1] - agent.previousPosition[1],
+      agent.targetPosition[2] - agent.previousPosition[2],
+    ];
+    agent.heading = Math.atan2(-movementDirection[2], movementDirection[0]);
+
+    // Rest of your drawing code remains the same
+    const translation = twgl.v3.create(...interpolatedPosition);
     const scale = twgl.v3.create(...agent.scale);
-    
-    // Create model matrix: translate, rotate, scale
+
     let modelMatrix = twgl.m4.identity();
     modelMatrix = twgl.m4.translate(modelMatrix, translation);
-    // Adjust rotation by subtracting 90 degrees
     modelMatrix = twgl.m4.rotateY(modelMatrix, agent.heading - Math.PI / 2);
     modelMatrix = twgl.m4.scale(modelMatrix, scale);
-    
-    // Compute the model-view-projection matrix
+
     const mvpMatrix = twgl.m4.multiply(viewProjectionMatrix, modelMatrix);
-    
-    // Compute the world inverse transpose matrix for normals
     const worldInverseTranspose = twgl.m4.transpose(twgl.m4.inverse(modelMatrix));
-    
-    // Set uniforms for this agent
+
     twgl.setUniforms(programInfo, {
       u_world: modelMatrix,
       u_matrix: mvpMatrix,
       u_worldInverseTranspose: worldInverseTranspose,
-      u_ambientColor: [1.0, 0.5, 0.0, 1.0],  // Orange color
+      u_ambientColor: [1.0, 0.5, 0.0, 1.0],
       u_diffuseColor: [1.0, 0.5, 0.0, 1.0],
       u_specularColor: [1.0, 0.5, 0.0, 1.0],
     });
-    
-    // Draw the agent
+
     twgl.drawBufferInfo(gl, agentsBufferInfo);
-  };
+  }
 }
+
+
+
 
 
 
@@ -976,6 +998,10 @@ function isAtDestination(agentPosition, destinations, tolerance = 0.1) {
     Math.abs(agentPosition[0] - destination.position[0]) <= tolerance &&
     Math.abs(agentPosition[2] - destination.position[2]) <= tolerance
   );
+}
+
+function lerp(start, end, t) {
+  return start + (end - start) * t;
 }
 
 

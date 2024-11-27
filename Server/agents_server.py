@@ -69,8 +69,6 @@ def getAgents():
                         })
             
             print(f"Found {len(car_positions)} cars")
-            for pos in car_positions:
-                print(f"Car {pos['id']} at position ({pos['x']}, {pos['z']})")
                 
             return jsonify({'positions': car_positions})
 
@@ -103,8 +101,7 @@ def getBuildings():
                         })
             
             print(f"Found {len(obstacles_positions)} obstacles")
-            for pos in obstacles_positions:
-                print(f"Obstacle {pos['id']} at position ({pos['x']}, {pos['z']})")
+
                 
             return jsonify({'positions': obstacles_positions})
 
@@ -136,8 +133,6 @@ def getLights():
                     })
             
             print(f"Found {len(light_positions)} Lights")
-            for pos in light_positions:
-                print(f"Light {pos['id']} at position ({pos['x']}, {pos['z']})")
                 
             return jsonify({'positions': light_positions})
 
@@ -217,7 +212,27 @@ def getDestinations():
             print(f"Error in getDestinations: {str(e)}")
             return jsonify({"message": f"Error retrieving Destination positions: {str(e)}"}), 500
 
+@app.route('/getStats', methods=['GET'])
+@cross_origin()
+def getStats():
+    """Retrieve the model's statistics: in_grid and reached_destination."""
+    global randomModel
 
+    if request.method == 'GET':
+        try:
+            if not randomModel:
+                return jsonify({"message": "Model not initialized"}), 400
+
+            stats = {
+                'in_grid': randomModel.in_grid,
+                'reached_destination': randomModel.reached_destination,
+            }
+
+            return jsonify(stats)
+
+        except Exception as e:
+            print(f"Error in getStats: {str(e)}")
+            return jsonify({"message": f"Error retrieving model stats: {str(e)}"}), 500
 
 @app.route('/update', methods=['GET'])
 @cross_origin()
