@@ -34,7 +34,7 @@ def agent_portrayal(agent):
         portrayal["h"] = 0.8
 
     if isinstance(agent, Car):
-        portrayal["Color"] = "darkblue"
+        portrayal["Color"] = agent.color
         portrayal["Layer"] = 1
         portrayal["Shape"] = "circle"
         portrayal["r"] = 0.5
@@ -57,8 +57,12 @@ agent_count_chart = ChartModule(
     [{"Label": "Cars in Grid", "Color": "blue"}],
     data_collector_name="datacollector"
 )
+arrived_chart = ChartModule(
+    [{"Label": "Cars Reached Destination", "Color": "red"}],
+    data_collector_name="datacollector"
+)
 
 # Set up the server with the bar chart and grid
-server = ModularServer(CityModel, [grid, agent_count_chart], "Traffic Simulation", {"N":0})
+server = ModularServer(CityModel, [grid, agent_count_chart, arrived_chart], "Traffic Simulation", {"N":0})
 server.port = 8522  # The default port for Mesa
 server.launch()
