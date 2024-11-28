@@ -679,7 +679,7 @@ function drawAgents(distance, agentsVao, agentsBufferInfo, viewProjectionMatrix)
 
     let modelMatrix = twgl.m4.identity();
     modelMatrix = twgl.m4.translate(modelMatrix, translation);
-    modelMatrix = twgl.m4.rotateY(modelMatrix, agent.heading - Math.PI / 2);
+    modelMatrix = twgl.m4.rotateY(modelMatrix, agent.heading + Math.PI / 2);
     modelMatrix = twgl.m4.scale(modelMatrix, scale);
 
     const mvpMatrix = twgl.m4.multiply(viewProjectionMatrix, modelMatrix);
