@@ -1,9 +1,13 @@
 # Import necessary modules
+# Imanol Santisteban 
+# Nicolas Alarcón
+# This code manages all of the model creation
+# 2024
 from mesa import Model
 from mesa.datacollection import DataCollector
 from mesa.time import RandomActivation
 from mesa.space import MultiGrid
-from .agent import *  # Ensure your agent classes (Car, Road, Traffic_Light, Destination, etc.) are correctly defined in this module
+from .agent import *  
 import json
 import random
 import networkx as nx  # For graph-based city navigation
