@@ -9,12 +9,12 @@ import fsGLSL from './shaders/fs_phong.glsl?raw';
 
 // Define the Building3D class to represent 3D objcetsCar
 class Building3D {
-  constructor(id, position=[0,0,0], rotation=[0,0,0], scale=[0.5,0.5,0.5]){
-  this.id = id;
-  this.position = position;
-  this.rotation = rotation;
-  this.scale = scale;
-  this.matrix = twgl.m4.create();
+  constructor(id, position = [0, 0, 0], rotation = [0, 0, 0], scale = [0.5, 0.5, 0.5]) {
+    this.id = id;
+    this.position = position;
+    this.rotation = rotation;
+    this.scale = scale;
+    this.matrix = twgl.m4.create();
   }
 }
 class Agent3D {
@@ -35,23 +35,23 @@ class Agent3D {
 }
 
 class TrafficLight3D {
-  constructor(id, position=[1,1,3],state, rotation=[0,0,0], scale=[0.2,0.2,0.2]){
-  this.id = id;
-  this.position = position;
-  this.rotation = rotation;
-  this.scale = scale;
-  this.matrix = twgl.m4.create();
-  this.state = state
+  constructor(id, position = [1, 1, 3], state, rotation = [0, 0, 0], scale = [0.2, 0.2, 0.2]) {
+    this.id = id;
+    this.position = position;
+    this.rotation = rotation;
+    this.scale = scale;
+    this.matrix = twgl.m4.create();
+    this.state = state
   }
 }
 class Road3D {
-  constructor(id, position=[1,1,3],direction, rotation=[0,0,0], scale=[0.3,0.5,0.7]){
-  this.id = id;
-  this.position = position;
-  this.rotation = rotation;
-  this.scale = scale;
-  this.matrix = twgl.m4.create();
-  this.direction=direction;
+  constructor(id, position = [1, 1, 3], direction, rotation = [0, 0, 0], scale = [0.3, 0.5, 0.7]) {
+    this.id = id;
+    this.position = position;
+    this.rotation = rotation;
+    this.scale = scale;
+    this.matrix = twgl.m4.create();
+    this.direction = direction;
   }
 }
 
@@ -62,19 +62,19 @@ const agent_server_uri = "http://localhost:8585/";
 // Initialize arrays to store agents and obstacles
 const agents = [];
 const Buildings = [];
-const traficLights= [];
-const Roads=[];
-const Destinations=[];
+const traficLights = [];
+const Roads = [];
+const Destinations = [];
 const MAX_LIGHTS = 24;
 
 const updateInterval = 100; // milliseconds
 let lastUpdateTime = performance.now();
 // Initialize WebGL-related variables
-let gl, programInfo, agentArrays, agentsBufferInfo, agentsVao, BuildingVAO,Building2Buffer, Building2VAO,wheelVAO,wheelBufferInfo,TrafficLightArrays,TrafficLightBuffer,TrafficLightVAO,BuildingBuffer,RoadBuffer,RoadVAO,SubterraBuffer,SubterraVAO,DestinationBuffer,DestinationVAO;
+let gl, programInfo, agentArrays, agentsBufferInfo, agentsVao, BuildingVAO, Building2Buffer, Building2VAO, wheelVAO, wheelBufferInfo, TrafficLightArrays, TrafficLightBuffer, TrafficLightVAO, BuildingBuffer, RoadBuffer, RoadVAO, SubterraBuffer, SubterraVAO, DestinationBuffer, DestinationVAO;
 
 // Define the camera position
-let cameraPosition = {x:0, y:9, z:9};
-let numberofcars=0;
+let cameraPosition = { x: 0, y: 9, z: 9 };
+let numberofcars = 0;
 // Initialize the frame count
 let frameCount = 0;
 const data = {
@@ -86,15 +86,15 @@ const lighting = {
   ambientLight: [0.2, 0.2, 0.2, 1.0],    // Ambient light color
   diffuseLight: [1.0, 1.0, 1.0, 1.0],    // Diffuse light color (white)
   specularLight: [1.0, 1.0, 1.0, 1.0],   // Specular light color (white)
-  
+
   ambientColor: [1.0, 1.0, 1.0, 1.0],    // Material ambient color
   diffuseColor: [0.6, 0.6, 0.6, 1.0],    // Material diffuse color
   specularColor: [1.0, 1.0, 1.0, 1.0],   // Material specular color
   shininess: 32.0,                        // Material shininess
-  
+
   lightWorldDirection: [0.5, 1.0, 0.5], // Directional light direction
-  viewWorldPosition: [cameraPosition.x + data.width/2, cameraPosition.y, cameraPosition.z + data.height/2], // Camera position
-  
+  viewWorldPosition: [cameraPosition.x + data.width / 2, cameraPosition.y, cameraPosition.z + data.height / 2], // Camera position
+
   numTrafficLights: 0,
   trafficLightPositions: new Float32Array(MAX_LIGHTS * 3),
   trafficLightColors: new Float32Array(MAX_LIGHTS * 3),
@@ -103,253 +103,281 @@ const lighting = {
 };
 
 // Define the data object
-const objcetsCar= {
+const objcetsCar = {
   model: {
-      transforms: {
-          // Translation
-          t: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in degrees
-          rd: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in radians
-          rr: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Scale
-          s: {
-              x: 1,
-              y: 1,
-              z: 1},
+    transforms: {
+      // Translation
+      t: {
+        x: 0,
+        y: 0,
+        z: 0
       },
-      arrays: undefined,
-      bufferInfo: undefined,
-      vao: undefined,
+      // Rotation in degrees
+      rd: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Rotation in radians
+      rr: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Scale
+      s: {
+        x: 1,
+        y: 1,
+        z: 1
+      },
+    },
+    arrays: undefined,
+    bufferInfo: undefined,
+    vao: undefined,
   }
 }
 const objcetsTrafficLight = {
   model: {
-      transforms: {
-          // Translation
-          t: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in degrees
-          rd: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in radians
-          rr: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Scale
-          s: {
-              x: 1,
-              y: 1,
-              z: 1},
+    transforms: {
+      // Translation
+      t: {
+        x: 0,
+        y: 0,
+        z: 0
       },
-      arrays: undefined,
-      bufferInfo: undefined,
-      vao: undefined,
+      // Rotation in degrees
+      rd: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Rotation in radians
+      rr: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Scale
+      s: {
+        x: 1,
+        y: 1,
+        z: 1
+      },
+    },
+    arrays: undefined,
+    bufferInfo: undefined,
+    vao: undefined,
   }
 }
-const objcetsBuilding= {
+const objcetsBuilding = {
   model: {
-      transforms: {
-          // Translation
-          t: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in degrees
-          rd: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in radians
-          rr: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Scale
-          s: {
-              x: 1,
-              y: 1,
-              z: 1},
+    transforms: {
+      // Translation
+      t: {
+        x: 0,
+        y: 0,
+        z: 0
       },
-      arrays: undefined,
-      bufferInfo: undefined,
-      vao: undefined,
+      // Rotation in degrees
+      rd: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Rotation in radians
+      rr: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Scale
+      s: {
+        x: 1,
+        y: 1,
+        z: 1
+      },
+    },
+    arrays: undefined,
+    bufferInfo: undefined,
+    vao: undefined,
   }
 }
-const objcetsBuilding2= {
+const objcetsBuilding2 = {
   model: {
-      transforms: {
-          // Translation
-          t: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in degrees
-          rd: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in radians
-          rr: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Scale
-          s: {
-              x: 1,
-              y: 1,
-              z: 1},
+    transforms: {
+      // Translation
+      t: {
+        x: 0,
+        y: 0,
+        z: 0
       },
-      arrays: undefined,
-      bufferInfo: undefined,
-      vao: undefined,
+      // Rotation in degrees
+      rd: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Rotation in radians
+      rr: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Scale
+      s: {
+        x: 1,
+        y: 1,
+        z: 1
+      },
+    },
+    arrays: undefined,
+    bufferInfo: undefined,
+    vao: undefined,
   }
 }
-const objcetsRoads= {
+const objcetsRoads = {
   model: {
-      transforms: {
-          // Translation
-          t: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in degrees
-          rd: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in radians
-          rr: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Scale
-          s: {
-              x: 1,
-              y: 1,
-              z: 1},
+    transforms: {
+      // Translation
+      t: {
+        x: 0,
+        y: 0,
+        z: 0
       },
-      arrays: undefined,
-      bufferInfo: undefined,
-      vao: undefined,
+      // Rotation in degrees
+      rd: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Rotation in radians
+      rr: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Scale
+      s: {
+        x: 1,
+        y: 1,
+        z: 1
+      },
+    },
+    arrays: undefined,
+    bufferInfo: undefined,
+    vao: undefined,
   }
 }
-const objcetsRoads1= {
+const objcetsRoads1 = {
   model: {
-      transforms: {
-          // Translation
-          t: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in degrees
-          rd: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in radians
-          rr: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Scale
-          s: {
-              x: 1,
-              y: -1,
-              z: 1},
+    transforms: {
+      // Translation
+      t: {
+        x: 0,
+        y: 0,
+        z: 0
       },
-      arrays: undefined,
-      bufferInfo: undefined,
-      vao: undefined,
+      // Rotation in degrees
+      rd: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Rotation in radians
+      rr: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Scale
+      s: {
+        x: 1,
+        y: -1,
+        z: 1
+      },
+    },
+    arrays: undefined,
+    bufferInfo: undefined,
+    vao: undefined,
   }
 }
-const objectsDestination= {
+const objectsDestination = {
   model: {
-      transforms: {
-          // Translation
-          t: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in degrees
-          rd: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Rotation in radians
-          rr: {
-              x: 0,
-              y: 0,
-              z: 0},
-          // Scale
-          s: {
-              x: 1,
-              y: -1,
-              z: 1},
+    transforms: {
+      // Translation
+      t: {
+        x: 0,
+        y: 0,
+        z: 0
       },
-      arrays: undefined,
-      bufferInfo: undefined,
-      vao: undefined,
+      // Rotation in degrees
+      rd: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Rotation in radians
+      rr: {
+        x: 0,
+        y: 0,
+        z: 0
+      },
+      // Scale
+      s: {
+        x: 1,
+        y: -1,
+        z: 1
+      },
+    },
+    arrays: undefined,
+    bufferInfo: undefined,
+    vao: undefined,
   }
 }
 // Main function to initialize and run the application
 async function main() {
   const canvas = document.querySelector('canvas');
   gl = canvas.getContext('webgl2');
-  
+
   programInfo = twgl.createProgramInfo(gl, [vsGLSL, fsGLSL]);
-  
+
 
   //const newTrafficLight = new TrafficLight3D('trafficLight', [5, 0, 3]);
   //traficLights.push(newTrafficLight);
 
-  const Car = await loadObj('./Figures/coche.obj',true,"Car");
+  const Car = await loadObj('./Figures/coche.obj', true, "Car");
   objcetsCar.model.arrays = Car;
 
-  const TrafficLight = await loadObj('./Figures/Semaforo2.obj',false,"TrafficLight");
+  const TrafficLight = await loadObj('./Figures/Semaforo2.obj', false, "TrafficLight");
   objcetsTrafficLight.model.arrays = TrafficLight;
 
-  const Buildings = await loadObj('./Figures/Building.obj',false,"Building");
+  const Buildings = await loadObj('./Figures/Building.obj', false, "Building");
   objcetsBuilding.model.arrays = Buildings;
 
-  const Building2 = await loadObj('./Figures/Building2.obj',false,"Building");
+  const Building2 = await loadObj('./Figures/Building2.obj', false, "Building");
   objcetsBuilding2.model.arrays = Building2;
 
-  const Road = await loadObj('./Figures/Road3.obj',false,"Road");
+  const Road = await loadObj('./Figures/Road.obj', false, "Road");
   objcetsRoads.model.arrays = Road;
-  
-  const Subterra = await loadObj('./Figures/Subterra2.obj',false,"Road");
+
+  const Subterra = await loadObj('./Figures/Subterra.obj', false, "Road");
   objcetsRoads1.model.arrays = Subterra;
 
   const destinationModelData = await loadObj('./Figures/Destination.obj', false, "Road");
-objectsDestination.model.arrays = destinationModelData;
+  objectsDestination.model.arrays = destinationModelData;
 
 
   //const obj7 = await loadObj('./Figures/Zeppeling.obj',false,"Road");
   //objectsZeppeling.model.arrays = obj7;
-  
-  console.log("LightArray",objcetsTrafficLight.model.arrays )
+
+  console.log("LightArray", objcetsTrafficLight.model.arrays)
   console.log("Car ARRAY:", objcetsCar.model.arrays);
   console.log("Building ARRAY:", objcetsBuilding.model.arrays);
   console.log("Road ARRAY:", objcetsRoads.model.arrays);
-  
+
   //agentArrays = generateData(1);
   //obstacleArrays = generateObstacleData(1);
-  
+
   // Create buffer infos
   //agentsBufferInfo = twgl.createBufferInfoFromArrays(gl, agentArrays);
   wheelBufferInfo = twgl.createBufferInfoFromArrays(gl, objcetsCar.model.arrays);
@@ -360,7 +388,7 @@ objectsDestination.model.arrays = destinationModelData;
   SubterraBuffer = twgl.createBufferInfoFromArrays(gl, objcetsRoads1.model.arrays);
   DestinationBuffer = twgl.createBufferInfoFromArrays(gl, objectsDestination.model.arrays);
   //BuildingBuffer = twgl.createBufferInfoFromArrays(gl, obstacleArrays);
-  
+
   // Create VAOs
   //agentsVao = twgl.createVAOFromBufferInfo(gl, programInfo, agentsBufferInfo);
   wheelVAO = twgl.createVAOFromBufferInfo(gl, programInfo, wheelBufferInfo);
@@ -371,7 +399,7 @@ objectsDestination.model.arrays = destinationModelData;
   SubterraVAO = twgl.createVAOFromBufferInfo(gl, programInfo, SubterraBuffer);
   DestinationVAO = twgl.createVAOFromBufferInfo(gl, programInfo, DestinationBuffer);
   //BuildingVAO = twgl.createVAOFromBufferInfo(gl, programInfo, BuildingBuffer);
-  
+
   setupUI();
   await initAgentsModel();
   await getLights();
@@ -382,7 +410,7 @@ objectsDestination.model.arrays = destinationModelData;
 
   setLightingUniforms();
   // Pass parameters in the correct order
-  await drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer, TrafficLightBuffer, TrafficLightVAO,RoadVAO,RoadBuffer,SubterraVAO,SubterraBuffer,DestinationVAO,DestinationBuffer);
+  await drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer, TrafficLightBuffer, TrafficLightVAO, RoadVAO, RoadBuffer, SubterraVAO, SubterraBuffer, DestinationVAO, DestinationBuffer);
 }
 
 
@@ -393,22 +421,22 @@ async function initAgentsModel() {
   try {
     // Send a POST request to the agent server to initialize the model
     let response = await fetch(agent_server_uri + "init", {
-      method: 'POST', 
-      headers: { 'Content-Type':'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     })
 
     // Check if the response was successful
-    if(response.ok){
+    if (response.ok) {
       // Parse the response as JSON and log the message
       let result = await response.json()
       console.log(result.message)
     }
-      
+
   } catch (error) {
     console.log("model was not created correctlly")
     // Log any errors that occur during the request
-    console.log(error)    
+    console.log(error)
   }
 }
 
@@ -460,7 +488,7 @@ async function getLights() {
 
       if (traficLights.length === 0) {
         for (const light of positions) {
-          const newLight = new TrafficLight3D(light.id, [light.x, light.y, light.z],light.state);
+          const newLight = new TrafficLight3D(light.id, [light.x, light.y, light.z], light.state);
           traficLights.push(newLight);
         }
       } else {
@@ -506,16 +534,16 @@ async function getBuildings() {
 async function getRoads() {
   try {
     // Send a GET request to the agent server to retrieve the obstacle positions
-    let response = await fetch(agent_server_uri + "getRoads") 
+    let response = await fetch(agent_server_uri + "getRoads")
 
     // Check if the response was successful
-    if(response.ok){
+    if (response.ok) {
       // Parse the response as JSON
       let result = await response.json()
 
       // Create new obstacles and add them to the obstacles array
       for (const Road of result.positions) {
-        const newRoad = new Road3D(Road.id, [Road.x, Road.y, Road.z],Road.direction)
+        const newRoad = new Road3D(Road.id, [Road.x, Road.y, Road.z], Road.direction)
         Roads.push(newRoad)
       }
       // Log the obstacles array
@@ -524,7 +552,7 @@ async function getRoads() {
 
   } catch (error) {
     // Log any errors that occur during the request
-    console.log(error) 
+    console.log(error)
   }
 }
 async function getDestinations() {
@@ -594,7 +622,7 @@ async function update() {
  * @param {WebGLVertexArrayObject} BuildingVAO - The vertex array object for obstacles.
  * @param {Object} BuildingBuffer - The buffer information for obstacles.
  */
-async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer,TrafficLightBuffer,TrafficLightVAO,RoadVAO,RoadBuffer,SubterraVAO,SubterraBuffer,DestinationVAO,DestinationBuffer) {
+async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer, TrafficLightBuffer, TrafficLightVAO, RoadVAO, RoadBuffer, SubterraVAO, SubterraBuffer, DestinationVAO, DestinationBuffer) {
   twgl.resizeCanvasToDisplaySize(gl.canvas);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl.clearColor(0.2, 0.2, 0.2, 1);
@@ -616,8 +644,8 @@ async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO
 
   // Pass wheelVAO and wheelBufferInfo instead of agentsVao and agentsBufferInfo
   drawSubterra(distance, SubterraVAO, SubterraBuffer, viewProjectionMatrix);
-  drawAgents(distance, wheelVAO, wheelBufferInfo, viewProjectionMatrix); 
-  drawTrafficLights(distance, TrafficLightVAO, TrafficLightBuffer, viewProjectionMatrix); 
+  drawAgents(distance, wheelVAO, wheelBufferInfo, viewProjectionMatrix);
+  drawTrafficLights(distance, TrafficLightVAO, TrafficLightBuffer, viewProjectionMatrix);
   drawBuildings(distance, viewProjectionMatrix);
   drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix);
   drawDestination(distance, DestinationVAO, DestinationBuffer, viewProjectionMatrix);
@@ -629,7 +657,7 @@ async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO
   }
 
   // In your drawScene function, ensure all parameters are passed in the recursive call
-requestAnimationFrame(() => drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer, TrafficLightBuffer, TrafficLightVAO, RoadVAO, RoadBuffer, SubterraVAO, SubterraBuffer,DestinationVAO,DestinationBuffer));
+  requestAnimationFrame(() => drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer, TrafficLightBuffer, TrafficLightVAO, RoadVAO, RoadBuffer, SubterraVAO, SubterraBuffer, DestinationVAO, DestinationBuffer));
 
 }
 
@@ -710,11 +738,11 @@ function drawAgents(distance, agentsVao, agentsBufferInfo, viewProjectionMatrix)
 
 function drawTrafficLights(distance, trafficLightVAO, trafficLightBufferInfo, viewProjectionMatrix) {
   gl.bindVertexArray(trafficLightVAO);
-  
+
   traficLights.forEach(trafficLight => {
     const translation = twgl.v3.create(...trafficLight.position);
     const scale = twgl.v3.create(...trafficLight.scale);
-    
+
     // Create model matrix
     let modelMatrix = twgl.m4.identity();
     modelMatrix = twgl.m4.translate(modelMatrix, translation);
@@ -722,10 +750,10 @@ function drawTrafficLights(distance, trafficLightVAO, trafficLightBufferInfo, vi
     modelMatrix = twgl.m4.rotateY(modelMatrix, trafficLight.rotation[1]);
     modelMatrix = twgl.m4.rotateZ(modelMatrix, trafficLight.rotation[2]);
     modelMatrix = twgl.m4.scale(modelMatrix, scale);
-    
+
     // Compute the model-view-projection matrix
     const mvpMatrix = twgl.m4.multiply(viewProjectionMatrix, modelMatrix);
-    
+
     // Compute the world inverse transpose matrix for normals
     const worldInverseTranspose = twgl.m4.transpose(twgl.m4.inverse(modelMatrix));
 
@@ -737,10 +765,10 @@ function drawTrafficLights(distance, trafficLightVAO, trafficLightBufferInfo, vi
       // Green state
       color = [1.0, 0.0, 0.0, 1.0];
     }
-    
+
     // Optionally, add emissive color
     let emissiveColor = color;
-    
+
     // Set uniforms for this traffic light
     twgl.setUniforms(programInfo, {
       u_world: modelMatrix,
@@ -751,14 +779,14 @@ function drawTrafficLights(distance, trafficLightVAO, trafficLightBufferInfo, vi
       u_specularColor: [1.0, 0.0, 0.5, 1.0],
       u_emissiveColor: emissiveColor,
     });
-    
+
     // Draw the traffic light
     twgl.drawBufferInfo(gl, trafficLightBufferInfo);
   });
 }
 
 
-      
+
 /*
  * Draws the obstacles.
  * 
@@ -813,13 +841,13 @@ function drawBuildings(distance, viewProjectionMatrix) {
 
 
 
-function drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix){
+function drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix) {
   gl.bindVertexArray(RoadVAO);
 
   Roads.forEach(Road => {
     const translation = twgl.v3.create(...Road.position);
     const scale = twgl.v3.create(...Road.scale);
-    
+
     // Adjust rotation based on direction
     if (
       (Road.direction[0] === 0 && Road.direction[1] === 1) ||  // Matches (0, 1)
@@ -829,7 +857,7 @@ function drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix){
     } else {
       Road.rotation[1] = Math.PI / 2; // 90 degrees in radians
     }
-    
+
     // Create model matrix
     let modelMatrix = twgl.m4.identity();
     modelMatrix = twgl.m4.translate(modelMatrix, translation);
@@ -837,13 +865,13 @@ function drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix){
     modelMatrix = twgl.m4.rotateY(modelMatrix, Road.rotation[1]);
     modelMatrix = twgl.m4.rotateZ(modelMatrix, Road.rotation[2]);
     modelMatrix = twgl.m4.scale(modelMatrix, scale);
-    
+
     // Compute the model-view-projection matrix
     const mvpMatrix = twgl.m4.multiply(viewProjectionMatrix, modelMatrix);
-    
+
     // Compute the world inverse transpose matrix for normals
     const worldInverseTranspose = twgl.m4.transpose(twgl.m4.inverse(modelMatrix));
-    
+
     // Set uniforms for this road
     twgl.setUniforms(programInfo, {
       u_world: modelMatrix,
@@ -852,9 +880,9 @@ function drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix){
       u_ambientColor: [1.0, 1.0, , 1.0],  // Dark gray color
       u_diffuseColor: [1.0, 1.0, , 1.0],
       u_specularColor: [1.0, 1.0, , 1.0],
-      u_emissiveColor: [0.0,0.0,0.0,1.0],
+      u_emissiveColor: [0.0, 0.0, 0.0, 1.0],
     });
-    
+
     // Draw the road
     twgl.drawBufferInfo(gl, RoadBuffer);
   });
@@ -882,7 +910,7 @@ function drawSubterra(distance, SubterraVAO, SubterraBuffer, viewProjectionMatri
     u_world: modelMatrix,
     u_matrix: mvpMatrix,
     u_worldInverseTranspose: worldInverseTranspose,
-    u_ambientColor: [0.5, 0.5, 0.5, 1.0], 
+    u_ambientColor: [0.5, 0.5, 0.5, 1.0],
     u_diffuseColor: [0.5, 0.5, 0.5, 1.0],
     u_specularColor: [0.5, 0.5, 0.5, 1.0],  // Slight specular highlight
     u_emissiveColor: [0.0, 0.0, 0.0, 1.0],
@@ -897,7 +925,7 @@ function drawDestination(distance, DestinationVAO, DestinationBufferInfo, viewPr
   Destinations.forEach(destination => {
     // Set position and offset y-coordinate to render above the grid
     const translation = twgl.v3.create(destination.position[0], 1, destination.position[2]);
-    const scale = twgl.v3.create(3,3,3);
+    const scale = twgl.v3.create(3, 3, 3);
 
     // Create model matrix
     let modelMatrix = twgl.m4.identity();
@@ -933,15 +961,15 @@ function setLightingUniforms() {
     u_ambientLight: lighting.ambientLight,
     u_diffuseLight: lighting.diffuseLight,
     u_specularLight: lighting.specularLight,
-    
+
     u_ambientColor: lighting.ambientColor,
     u_diffuseColor: lighting.diffuseColor,
     u_specularColor: lighting.specularColor,
     u_shininess: lighting.shininess,
-    
+
     u_lightWorldDirection: lighting.lightWorldDirection,
     u_viewWorldPosition: lighting.viewWorldPosition,
-    
+
   });
 }
 
@@ -952,37 +980,37 @@ function setLightingUniforms() {
  * @returns {Float32Array} The view-projection matrix.
  */
 function setupWorldView(gl) {
-    // Set the field of view (FOV) in radians
-    const fov = 45 * Math.PI / 180;
+  // Set the field of view (FOV) in radians
+  const fov = 45 * Math.PI / 180;
 
-    // Calculate the aspect ratio of the canvas
-    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+  // Calculate the aspect ratio of the canvas
+  const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
 
-    // Create the projection matrix
-    const projectionMatrix = twgl.m4.perspective(fov, aspect, 1, 200);
+  // Create the projection matrix
+  const projectionMatrix = twgl.m4.perspective(fov, aspect, 1, 200);
 
-    // Set the target position
-    const target = [data.width/2, 0, data.height/2];
+  // Set the target position
+  const target = [data.width / 2, 0, data.height / 2];
 
-    // Set the up vector
-    const up = [0, 1, 0];
+  // Set the up vector
+  const up = [0, 1, 0];
 
-    // Calculate the camera position
-    const camPos = twgl.v3.create(cameraPosition.x + data.width/2, cameraPosition.y, cameraPosition.z+data.height/2)
+  // Calculate the camera position
+  const camPos = twgl.v3.create(cameraPosition.x + data.width / 2, cameraPosition.y, cameraPosition.z + data.height / 2)
 
-    // Create the camera matrix
-    const cameraMatrix = twgl.m4.lookAt(camPos, target, up);
+  // Create the camera matrix
+  const cameraMatrix = twgl.m4.lookAt(camPos, target, up);
 
-    // Calculate the view matrix
-    const viewMatrix = twgl.m4.inverse(cameraMatrix);
+  // Calculate the view matrix
+  const viewMatrix = twgl.m4.inverse(cameraMatrix);
 
-    // Calculate the view-projection matrix
-    const viewProjectionMatrix = twgl.m4.multiply(projectionMatrix, viewMatrix);
-    
-    lighting.viewWorldPosition = camPos;
-  
-    // Return the view-projection matrix
-    return viewProjectionMatrix;
+  // Calculate the view-projection matrix
+  const viewProjectionMatrix = twgl.m4.multiply(projectionMatrix, viewMatrix);
+
+  lighting.viewWorldPosition = camPos;
+
+  // Return the view-projection matrix
+  return viewProjectionMatrix;
 }
 
 /*
@@ -991,7 +1019,7 @@ function setupWorldView(gl) {
 function setupUI() {
   const gui = new GUI();
   const posFolder = gui.addFolder('Camera Position');
-  
+
   posFolder.add(cameraPosition, 'x', -50, 50).onChange(updateCameraPosition);
   posFolder.add(cameraPosition, 'y', -50, 50).onChange(updateCameraPosition);
   posFolder.add(cameraPosition, 'z', -50, 50).onChange(updateCameraPosition);
@@ -1023,7 +1051,7 @@ function updateCameraPosition() {
   // Recalculate the viewProjectionMatrix
   setupWorldView(gl);
   // Update the camera position in the lighting object
-  lighting.viewWorldPosition = [cameraPosition.x + data.width/2, cameraPosition.y, cameraPosition.z+data.height/2];
+  lighting.viewWorldPosition = [cameraPosition.x + data.width / 2, cameraPosition.y, cameraPosition.z + data.height / 2];
   // Do not set the uniform here; it will be set in drawScene()
 }
 function updateLighting() {
@@ -1033,14 +1061,14 @@ function updateLighting() {
 function updateTrafficLightUniforms() {
   lighting.numTrafficLights = Math.min(traficLights.length, MAX_LIGHTS);
   for (let i = 0; i < lighting.numTrafficLights; i++) {
-      const trafficLight = traficLights[i];
-      const pos = trafficLight.position; 
-      const color = trafficLight.state ? [0.0, 1.0, 0.0] : [1.0, 0.0, 0.0];
+    const trafficLight = traficLights[i];
+    const pos = trafficLight.position;
+    const color = trafficLight.state ? [0.0, 1.0, 0.0] : [1.0, 0.0, 0.0];
 
-      lighting.trafficLightPositions.set(pos, i * 3);
-      lighting.trafficLightColors.set(color, i * 3);
-      lighting.trafficLightDirections.set([0, -1, 0], i * 3); 
-      lighting.trafficLightCutoffs[i] = Math.cos(30 * Math.PI / 180); 
+    lighting.trafficLightPositions.set(pos, i * 3);
+    lighting.trafficLightColors.set(color, i * 3);
+    lighting.trafficLightDirections.set([0, -1, 0], i * 3);
+    lighting.trafficLightCutoffs[i] = Math.cos(30 * Math.PI / 180);
   }
 }
 function updateStatsUI(stats) {
@@ -1048,59 +1076,59 @@ function updateStatsUI(stats) {
   document.getElementById('cars-in-grid').textContent = stats.in_grid;
   document.getElementById('cars-reached-destination').textContent = stats.reached_destination;
 }
-async function loadObj(route, shouldScaleSmall,type) {
+async function loadObj(route, shouldScaleSmall, type) {
   try {
-      const response = await fetch(route);
-      if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+    const response = await fetch(route);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.text();
+
+    const structure = {
+      a_position: { numComponents: 3, data: [] },
+      a_color: { numComponents: 4, data: [] },
+      a_normal: { numComponents: 3, data: [] },
+      a_texCoord: { numComponents: 2, data: [] }
+    };
+
+    const vertices = [];
+    const normals = [];
+
+    const lines = data.split('\n');
+    for (const line of lines) {
+      const parts = line.trim().split(/\s+/);
+      const prefix = parts[0];
+
+      if (prefix === 'v') {
+        // Vertex positions
+        vertices.push([parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3])]);
+      } else if (prefix === 'vn') {
+        // Vertex normals
+        normals.push([parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3])]);
+      } else if (prefix === 'f') {
+        for (let i = 1; i < parts.length; i++) {
+          const indices = parts[i].split('/').map(num => parseInt(num, 10) - 1);
+          const vertexIndex = indices[0];
+          const normalIndex = indices[2];
+          const vertex = vertices[vertexIndex];
+          const normal = normals[normalIndex];
+          const scale = shouldScaleSmall ? 0.01 : 0.5;
+          const scaledVertex = vertex.map(coord => coord * scale);
+
+          structure.a_position.data.push(...scaledVertex);
+          if (type == "Car") { structure.a_color.data.push(0.0, 0.0, 0.0, 1.0); }
+          else if (type == "TrafficLight") { structure.a_color.data.push(0.0, 0.0, 0.0, 1.0); }
+          else if (type == "Building") { structure.a_color.data.push(0.0, 0.0, 0.0, 1.0); }  // Fixed color for all vertices
+          else if (type == "Road") { structure.a_color.data.push(0.0, 0.0, 0.0, 1.0); }  // Fixed color for all vertices
+          structure.a_normal.data.push(...normal);
+        }
       }
-      const data = await response.text();
+    }
 
-      const structure = {
-          a_position: { numComponents: 3, data: [] },
-          a_color: { numComponents: 4, data: [] },
-          a_normal: { numComponents: 3, data: [] },
-          a_texCoord: { numComponents: 2, data: [] }
-      };
-
-      const vertices = [];
-      const normals = [];
-
-      const lines = data.split('\n');
-      for (const line of lines) {
-          const parts = line.trim().split(/\s+/);
-          const prefix = parts[0];
-
-          if (prefix === 'v') {
-              // Vertex positions
-              vertices.push([parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3])]);
-          } else if (prefix === 'vn') {
-              // Vertex normals
-              normals.push([parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3])]);
-          } else if (prefix === 'f') {
-              for (let i = 1; i < parts.length; i++) {
-                  const indices = parts[i].split('/').map(num => parseInt(num, 10) - 1);
-                  const vertexIndex = indices[0];
-                  const normalIndex = indices[2];
-                  const vertex = vertices[vertexIndex];
-                  const normal = normals[normalIndex];
-                  const scale = shouldScaleSmall ? 0.01 : 0.5;
-                  const scaledVertex = vertex.map(coord => coord * scale);
-
-                  structure.a_position.data.push(...scaledVertex);
-                  if(type=="Car"){structure.a_color.data.push(0.0, 0.0, 0.0, 1.0);}
-                  else if (type=="TrafficLight"){structure.a_color.data.push(0.0, 0.0, 0.0, 1.0);}
-                  else if (type=="Building"){structure.a_color.data.push(0.0, 0.0, 0.0, 1.0);}  // Fixed color for all vertices
-                  else if (type=="Road"){structure.a_color.data.push(0.0, 0.0, 0.0, 1.0);}  // Fixed color for all vertices
-                  structure.a_normal.data.push(...normal);
-              }
-          }
-      }
-
-      console.log("Structured Data:", structure);
-      return structure;
+    console.log("Structured Data:", structure);
+    return structure;
   } catch (err) {
-      console.error("Error loading OBJ file:", err);
+    console.error("Error loading OBJ file:", err);
   }
 }
 
@@ -1108,10 +1136,10 @@ function calculateHeading(currentPos, previousPos) {
   // Calculate direction vector
   const dx = currentPos[0] - previousPos[0];
   const dz = currentPos[2] - previousPos[2]; // Using z instead of y for ground plane
-  
+
   // Calculate angle in radians
   let angle = Math.atan2(-dz, dx);
-  
+
   // Only update heading if there's significant movement
   if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
     return angle;
@@ -1120,7 +1148,7 @@ function calculateHeading(currentPos, previousPos) {
 }
 
 function isAtDestination(agentPosition, destinations, tolerance = 0.1) {
-  return destinations.some(destination => 
+  return destinations.some(destination =>
     Math.abs(agentPosition[0] - destination.position[0]) <= tolerance &&
     Math.abs(agentPosition[2] - destination.position[2]) <= tolerance
   );
