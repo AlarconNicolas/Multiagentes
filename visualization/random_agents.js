@@ -18,7 +18,7 @@ class Building3D {
   }
 }
 class Agent3D {
-  constructor(id, position = [0, 0, 0], rotation = [0, 0, 0], scale = [1, 1, 1]) {
+  constructor(id, position = [0, 0, 0], rotation = [0, 0, 0], scale = [0.5, 0.5, 0.5]) {
     this.id = id;
     this.position = position;
     this.currentPosition = [...position];      // Current interpolated position
