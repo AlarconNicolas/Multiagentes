@@ -70,7 +70,7 @@ const MAX_LIGHTS = 24;
 const updateInterval = 100; // milliseconds
 let lastUpdateTime = performance.now();
 // Initialize WebGL-related variables
-let gl, programInfo, agentArrays, agentsBufferInfo, agentsVao, BuildingVAO,Building2Buffer, Building2VAO,wheelVAO,wheelBufferInfo,TrafficLightArrays,TrafficLightBuffer,TrafficLightVAO,BuildingBuffer,RoadBuffer,RoadVAO,SubterraBuffer,SubterraVAO;
+let gl, programInfo, agentArrays, agentsBufferInfo, agentsVao, BuildingVAO,Building2Buffer, Building2VAO,wheelVAO,wheelBufferInfo,TrafficLightArrays,TrafficLightBuffer,TrafficLightVAO,BuildingBuffer,RoadBuffer,RoadVAO,SubterraBuffer,SubterraVAO,DestinationBuffer,DestinationVAO;
 
 // Define the camera position
 let cameraPosition = {x:0, y:9, z:9};
@@ -277,7 +277,7 @@ const objcetsRoads1= {
       vao: undefined,
   }
 }
-const objectsZeppeling= {
+const objectsDestination= {
   model: {
       transforms: {
           // Translation
@@ -317,26 +317,30 @@ async function main() {
   //const newTrafficLight = new TrafficLight3D('trafficLight', [5, 0, 3]);
   //traficLights.push(newTrafficLight);
 
-  const obj1 = await loadObj('./Figures/coche.obj',true,"Car");
-  objcetsCar.model.arrays = obj1;
+  const Car = await loadObj('./Figures/coche.obj',true,"Car");
+  objcetsCar.model.arrays = Car;
 
-  const obj2 = await loadObj('./Figures/Semaforo2.obj',false,"TrafficLight");
-  objcetsTrafficLight.model.arrays = obj2;
+  const TrafficLight = await loadObj('./Figures/Semaforo2.obj',false,"TrafficLight");
+  objcetsTrafficLight.model.arrays = TrafficLight;
 
-  const obj3 = await loadObj('./Figures/Building.obj',false,"Building");
-  objcetsBuilding.model.arrays = obj3;
+  const Buildings = await loadObj('./Figures/Building.obj',false,"Building");
+  objcetsBuilding.model.arrays = Buildings;
 
-  const obj4 = await loadObj('./Figures/Building2.obj',false,"Building");
-  objcetsBuilding2.model.arrays = obj4;
+  const Building2 = await loadObj('./Figures/Building2.obj',false,"Building");
+  objcetsBuilding2.model.arrays = Building2;
 
-  const obj5 = await loadObj('./Figures/Road3.obj',false,"Road");
-  objcetsRoads.model.arrays = obj5;
+  const Road = await loadObj('./Figures/Road3.obj',false,"Road");
+  objcetsRoads.model.arrays = Road;
   
-  const obj6 = await loadObj('./Figures/Subterra2.obj',false,"Road");
-  objcetsRoads1.model.arrays = obj6;
+  const Subterra = await loadObj('./Figures/Subterra2.obj',false,"Road");
+  objcetsRoads1.model.arrays = Subterra;
 
-  const obj7 = await loadObj('./Figures/Zeppeling.obj',false,"Road");
-  objectsZeppeling.model.arrays = obj7;
+  const destinationModelData = await loadObj('./Figures/Destination.obj', false, "Road");
+objectsDestination.model.arrays = destinationModelData;
+
+
+  //const obj7 = await loadObj('./Figures/Zeppeling.obj',false,"Road");
+  //objectsZeppeling.model.arrays = obj7;
   
   console.log("LightArray",objcetsTrafficLight.model.arrays )
   console.log("Car ARRAY:", objcetsCar.model.arrays);
@@ -354,6 +358,7 @@ async function main() {
   Building2Buffer = twgl.createBufferInfoFromArrays(gl, objcetsBuilding2.model.arrays);
   RoadBuffer = twgl.createBufferInfoFromArrays(gl, objcetsRoads.model.arrays);
   SubterraBuffer = twgl.createBufferInfoFromArrays(gl, objcetsRoads1.model.arrays);
+  DestinationBuffer = twgl.createBufferInfoFromArrays(gl, objectsDestination.model.arrays);
   //BuildingBuffer = twgl.createBufferInfoFromArrays(gl, obstacleArrays);
   
   // Create VAOs
@@ -364,6 +369,7 @@ async function main() {
   Building2VAO = twgl.createVAOFromBufferInfo(gl, programInfo, Building2Buffer);
   RoadVAO = twgl.createVAOFromBufferInfo(gl, programInfo, RoadBuffer);
   SubterraVAO = twgl.createVAOFromBufferInfo(gl, programInfo, SubterraBuffer);
+  DestinationVAO = twgl.createVAOFromBufferInfo(gl, programInfo, DestinationBuffer);
   //BuildingVAO = twgl.createVAOFromBufferInfo(gl, programInfo, BuildingBuffer);
   
   setupUI();
@@ -376,7 +382,7 @@ async function main() {
 
   setLightingUniforms();
   // Pass parameters in the correct order
-  await drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer, TrafficLightBuffer, TrafficLightVAO,RoadVAO,RoadBuffer,SubterraVAO,SubterraBuffer);
+  await drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer, TrafficLightBuffer, TrafficLightVAO,RoadVAO,RoadBuffer,SubterraVAO,SubterraBuffer,DestinationVAO,DestinationBuffer);
 }
 
 
@@ -523,28 +529,26 @@ async function getRoads() {
 }
 async function getDestinations() {
   try {
-    // Send a GET request to the agent server to retrieve the obstacle positions
-    let response = await fetch(agent_server_uri + "getDestinations") 
+    let response = await fetch(agent_server_uri + "getDestinations");
+    if (response.ok) {
+      let result = await response.json();
 
-    // Check if the response was successful
-    if(response.ok){
-      // Parse the response as JSON
-      let result = await response.json()
-
-      // Create new obstacles and add them to the obstacles array
-      for (const Road of result.positions) {
-        const newRoad = new Road3D(Road.id, [Road.x, Road.y, Road.z])
-        Destinations.push(newRoad)
+      // Populate the Destinations array with position data
+      for (const dest of result.positions) {
+        Destinations.push({
+          id: dest.id,
+          position: [dest.x, dest.y, dest.z],
+          scale: [1, 1, 1], // Scale for rendering
+        });
       }
-      // Log the obstacles array
-      console.log("Roads:", Destinations)
-    }
 
+      console.log("Destinations:", Destinations);
+    }
   } catch (error) {
-    // Log any errors that occur during the request
-    console.log(error) 
+    console.error("Error fetching destinations:", error);
   }
 }
+
 
 async function getModelStats() {
   try {
@@ -590,7 +594,7 @@ async function update() {
  * @param {WebGLVertexArrayObject} BuildingVAO - The vertex array object for obstacles.
  * @param {Object} BuildingBuffer - The buffer information for obstacles.
  */
-async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer,TrafficLightBuffer,TrafficLightVAO,RoadVAO,RoadBuffer,SubterraVAO,SubterraBuffer) {
+async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer,TrafficLightBuffer,TrafficLightVAO,RoadVAO,RoadBuffer,SubterraVAO,SubterraBuffer,DestinationVAO,DestinationBuffer) {
   twgl.resizeCanvasToDisplaySize(gl.canvas);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl.clearColor(0.2, 0.2, 0.2, 1);
@@ -616,6 +620,7 @@ async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO
   drawTrafficLights(distance, TrafficLightVAO, TrafficLightBuffer, viewProjectionMatrix); 
   drawBuildings(distance, viewProjectionMatrix);
   drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix);
+  drawDestination(distance, DestinationVAO, DestinationBuffer, viewProjectionMatrix);
 
   const currentTime = performance.now();
   if (currentTime - lastUpdateTime >= updateInterval) {
@@ -624,7 +629,7 @@ async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO
   }
 
   // In your drawScene function, ensure all parameters are passed in the recursive call
-requestAnimationFrame(() => drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer, TrafficLightBuffer, TrafficLightVAO, RoadVAO, RoadBuffer, SubterraVAO, SubterraBuffer));
+requestAnimationFrame(() => drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO, BuildingBuffer, TrafficLightBuffer, TrafficLightVAO, RoadVAO, RoadBuffer, SubterraVAO, SubterraBuffer,DestinationVAO,DestinationBuffer));
 
 }
 
@@ -886,6 +891,40 @@ function drawSubterra(distance, SubterraVAO, SubterraBuffer, viewProjectionMatri
   // Draw the subterra
   twgl.drawBufferInfo(gl, SubterraBuffer);
 }
+function drawDestination(distance, DestinationVAO, DestinationBufferInfo, viewProjectionMatrix) {
+  gl.bindVertexArray(DestinationVAO);
+
+  Destinations.forEach(destination => {
+    // Set position and offset y-coordinate to render above the grid
+    const translation = twgl.v3.create(destination.position[0], 1, destination.position[2]);
+    const scale = twgl.v3.create(3,3,3);
+
+    // Create model matrix
+    let modelMatrix = twgl.m4.identity();
+    modelMatrix = twgl.m4.translate(modelMatrix, translation);
+    modelMatrix = twgl.m4.scale(modelMatrix, scale);
+
+    // Compute matrices
+    const mvpMatrix = twgl.m4.multiply(viewProjectionMatrix, modelMatrix);
+    const worldInverseTranspose = twgl.m4.transpose(twgl.m4.inverse(modelMatrix));
+
+    // Set uniforms for rendering
+    twgl.setUniforms(programInfo, {
+      u_world: modelMatrix,
+      u_matrix: mvpMatrix,
+      u_worldInverseTranspose: worldInverseTranspose,
+      u_ambientColor: [1.0, 0.0, 0.0, 1.0],  // Blue for destinations
+      u_diffuseColor: [1.0, 0.0, .0, 1.0],
+      u_specularColor: [1.0, 1.0, 1.0, 1.0],
+      u_emissiveColor: [0.1, 0.1, 0.3, 1.0], // Slight emissive glow
+    });
+
+    // Draw the destination model
+    twgl.drawBufferInfo(gl, DestinationBufferInfo);
+  });
+}
+
+
 
 
 
