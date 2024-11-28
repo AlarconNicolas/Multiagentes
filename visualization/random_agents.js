@@ -1,3 +1,8 @@
+//Imanol Santisteban
+//Nicolas Alarcón
+//This code manages all of the webGL rendering
+//2024
+
 'use strict';
 
 import * as twgl from 'twgl.js';

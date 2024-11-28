@@ -1,3 +1,8 @@
+# Imanol Santisteban 
+# Nicolas Alarcón
+# This code manages all of the agents and their qualitites and attributes
+# 2024
+
 from mesa import Agent
 import random
 

@@ -1,6 +1,7 @@
-# TC2008B. Sistemas Multiagentes y Gráficas Computacionales
-# Python Flask server to interact with WebGL.
-# Octavio Navarro. 2024
+# Imanol Santisteban 
+# Nicolas Alarcón
+# This code manages all of the API requests
+# 2024
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
