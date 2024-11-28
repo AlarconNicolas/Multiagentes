@@ -257,7 +257,7 @@ class CityModel(Model):
         """
         Attempts to spawn up to 4 cars at corner positions if available.
         """
-        if self.step_count % 2 != 0:
+        if self.step_count % 1 != 0:
             return None
 
         available_positions = [
