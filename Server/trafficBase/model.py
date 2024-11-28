@@ -1,118 +1,187 @@
+# Import necessary modules
 from mesa import Model
 from mesa.datacollection import DataCollector
 from mesa.time import RandomActivation
 from mesa.space import MultiGrid
-from .agent import *
+from .agent import *  # Ensure your agent classes (Car, Road, Traffic_Light, Destination, etc.) are correctly defined in this module
 import json
 import random
-import networkx as nx
+import networkx as nx  # For graph-based city navigation
 
+# Define the main city simulation model
 class CityModel(Model):
     def __init__(self, N):
+        """
+        Initialize the city simulation model.
+
+        Parameters:
+        - N: Number of cars to spawn initially (not directly used in this code).
+        """
         super().__init__()
-        self.reached_destination = 0
-        self.in_grid = 0
-        self.corner_positions = []
-        self.running = True
+        self.reached_destination = 0  # Counter for cars that reached their destination
+        self.in_grid = 0  # Counter for cars currently in the grid
+        self.corner_positions = []  # Positions designated for spawning cars
+        self.running = True  # Controls the simulation run state
+        self.step_count = 0  # Step counter
+        self.n = N  # Number of cars to potentially spawn
+
+        # Initialize DataCollector to track model metrics
         self.datacollector = DataCollector(
             model_reporters={
                 "Cars in Grid": lambda m: m.in_grid,
                 "Cars Reached Destination": lambda m: m.reached_destination,
             }
         )
-        
-        # Load the map dictionary
 
-        dataDictionary = json.load(open("./static/city_files/mapDictionary.json"))
-        self.traffic_lights = []
-        self.traffic_lights_S = []
-        self.traffic_lights_s = []
-        self.destinations = []
-        self.corner_positions = []
-        
-        # Load the map file and create graph
-        map_path = './static/city_files/2022_base.txt'
+        # Load the map dictionary (provides additional map-related data if needed)
+        with open("./static/city_files/mapDictionary.json") as f:
+            dataDictionary = json.load(f)
+
+        # Separate lists for traffic lights and destination positions
+        self.traffic_lights_S = []  # Vertical traffic lights
+        self.traffic_lights_s = []  # Horizontal traffic lights
+        self.destinations = []  # Destination positions
+
+        # Define arrow orientations for navigation
+        self.arrow_orientations = {
+            '>': (1, 0),    # Right
+            '<': (-1, 0),   # Left
+            '^': (0, 1),    # Up
+            'v': (0, -1),   # Down
+        }
+
+        # Load the map file and create the grid
+        map_path = './static/city_files/2024_base.txt'
         with open(map_path) as baseFile:
             lines = baseFile.readlines()
-            self.width = len(lines[0])-1
-            self.height = len(lines)
-            self.grid = MultiGrid(self.width, self.height, torus=False)
-            self.schedule = RandomActivation(self)
-            
-            # Create basic grid structure
+            self.width = len(lines[0].strip())  # Grid width
+            self.height = len(lines)  # Grid height
+            self.grid = MultiGrid(self.width, self.height, torus=False)  # Non-wrapping grid
+            self.schedule = RandomActivation(self)  # Random activation schedule for agents
+
+            # Create the grid structure by parsing the map file
             for r, row in enumerate(lines):
-                for c, col in enumerate(row):
-                    if col in ["v", "^", ">", "<"]:
-                        agent = Road(f"r_{r*self.width+c}", self, dataDictionary[col])
-                        agent.direction=col
-                        print("The road directions is:", agent.direction)
-                        self.grid.place_agent(agent, (c, self.height - r - 1))
+                for c, col in enumerate(row.strip('\n')):
+                    pos = (c, self.height - r - 1)  # Align Y-axis correctly
+                    unique_id = f"{col}_{r*self.width+c}"
+                    if col in self.arrow_orientations:
+                        # Create Road agent with appropriate direction
+                        direction = tuple(self.arrow_orientations[col])
+                        agent = Road(f"r_{r*self.width+c}", self, direction)
+                        self.grid.place_agent(agent, pos)
                     elif col in ["S", "s"]:
+                        # Create Traffic_Light agent and add to appropriate list
                         is_horizontal = (col == "s")
                         agent = Traffic_Light(f"tl_{r*self.width+c}", self, is_horizontal=is_horizontal)
-                        self.grid.place_agent(agent, (c, self.height - r - 1))
+                        self.grid.place_agent(agent, pos)
                         self.schedule.add(agent)
                         if col == "S":
                             self.traffic_lights_S.append(agent)
                         else:
                             self.traffic_lights_s.append(agent)
                     elif col == "#":
+                        # Create Obstacle agent
                         agent = Obstacle(f"ob_{r*self.width+c}", self)
-                        self.grid.place_agent(agent, (c, self.height - r - 1))
-                    elif col == "D":
-                        agent = Destination(f"d_{r*self.width+c}", self)
-                        pos = (c, self.height - r - 1)
                         self.grid.place_agent(agent, pos)
-                        self.destinations.append(pos)        
-        
+                    elif col == "D":
+                        # Create Destination agent and store its position
+                        agent = Destination(f"d_{r*self.width+c}", self)
+                        self.grid.place_agent(agent, pos)
+                        self.destinations.append(pos)
+
+        # Create the city navigation graph based on the map
         self.navigation_graph = self.create_city_graph(map_path)
-        
-        # Bottom-left corner
-        self.corner_positions.append((0, 0))  
-        # Top-left corner
-        self.corner_positions.append((0, self.height - 1))  
-        # Bottom-right corner
-        self.corner_positions.append((self.width - 1, 0))  
-        # Top-right corner
-        self.corner_positions.append((self.width - 1, self.height - 1)) 
-        
-        self.spawn_positions = [
-            pos for pos in self.corner_positions
-            if any(isinstance(agent, Road) for agent in self.grid.get_cell_list_contents([pos]))
+
+        # Define corner positions for spawning cars
+        self.corner_positions = [
+            (0, 0),                          # Bottom-left corner
+            (0, self.height - 1),            # Top-left corner
+            (self.width - 1, 0),             # Bottom-right corner
+            (self.width - 1, self.height - 1)  # Top-right corner
         ]
+
+        self.car_id_counter = 0  # Unique ID counter for cars
+        self.light_timer = 0  # Timer for traffic light toggling
+        self.light_cycle_duration = 10  # Duration for each traffic light state
+
+    def lateral_moves(self, direction):
+        """
+        Returns the lateral movement directions based on the forward direction.
+        """
+        if direction == (1, 0):  # Right
+            return [(0, 1), (0, -1)]  # Up and Down
+        elif direction == (-1, 0):  # Left
+            return [(0, -1), (0, 1)]  # Down and Up
+        elif direction == (0, 1):  # Up
+            return [(-1, 0), (1, 0)]  # Left and Right
+        elif direction == (0, -1):  # Down
+            return [(1, 0), (-1, 0)]  # Right and Left
+        else:
+            return []
+
+    def get_allowed_moves(self, cell_type):
+        """
+        Returns the list of allowed movement directions based on the cell type.
+        """
+        if cell_type in self.arrow_orientations:
+            forward = self.arrow_orientations[cell_type]
+            lateral_moves = self.lateral_moves(forward)
+            return [forward] + lateral_moves
+        elif cell_type == 's':
+            return [(-1, 0), (1, 0)]  # Horizontal traffic light (left, right)
+        elif cell_type == 'S':
+            return [(0, -1), (0, 1)]  # Vertical traffic light (up, down)
+        elif cell_type == 'D':
+            return []  # Destination cells allow no outgoing movement
+        else:
+            return []
+
+    def valid_movement(self, current_cell_type, next_cell_type, dx, dy):
+        """
+        Determines if movement between two cells is valid based on rules:
+        - Movement allowed by current cell type.
+        - No U-turns or contrary movement.
+        """
+        if next_cell_type == '#':  # Obstacles are impassable
+            return False
+
+        # Check allowed moves for current cell type
+        allowed_moves = self.get_allowed_moves(current_cell_type)
+        if (dx, dy) not in allowed_moves:
+            return False
+
+        # Prevent movement into a contrary arrow
+        current_orientation = self.arrow_orientations.get(current_cell_type)
+        next_orientation = self.arrow_orientations.get(next_cell_type)
+        if next_orientation:
+            if current_orientation and (current_orientation[0] == -next_orientation[0] and current_orientation[1] == -next_orientation[1]):
+                return False
+
+        # Prevent U-turns
+        reverse_direction = (-dx, -dy)
+        if current_orientation == reverse_direction:
+            return False
         
-        self.car_id_counter = 0
-        self.num_agents = N
-        self.remaining_cars_to_spawn = int(N * len(self.corner_positions))
-        self.running = True
-        self.light_timer = 0  
-        self.light_cycle_duration = 10  
+        if next_cell_type in ["s", "S"]:
+            forward_direction = self.arrow_orientations.get(current_cell_type)
+            if forward_direction:
+                right_turn_direction = (forward_direction[1], -forward_direction[0])  # Rotate forward direction 90° clockwise
+                if (dx, dy) == right_turn_direction:
+                    return False
+
+        return True
 
     def create_city_graph(self, map_file_path):
         """
-        Creates a directed graph representation of the city based on the map file,
-        ensuring all valid cells are included as nodes and edges are added for valid movements,
-        respecting the directionality of roads and traffic lights.
+        Creates a directed graph representing the city layout based on the map file.
         """
         with open(map_file_path, 'r') as file:
             lines = file.readlines()
             height = len(lines)
             width = len(lines[0].strip())
 
-        city_graph = nx.DiGraph()  # Directed graph for city
+        city_graph = nx.DiGraph()
         cell_types = {}
-
-        # Define valid movement directions for each cell type
-        directions = {
-            '>': [(1, 0)],   # Right
-            '<': [(-1, 0)],  # Left
-            '^': [(0, 1)],   # Up
-            'v': [(0, -1)],  # Down
-            's': [],         # Horizontal traffic light (left/right)
-            'S': [],         # Vertical traffic light (up/down)
-            '#': [],         # Obstacle (no movement)
-            'D': []          # Destination (no movement)
-        }
 
         # Map cell types to their grid coordinates
         for y, line in enumerate(lines):
@@ -127,134 +196,124 @@ class CityModel(Model):
 
         # Add edges based on movement rules
         for pos, cell in cell_types.items():
-            if cell == '#':  # Skip obstacles
+            if cell == '#' or cell == 'D':  # Skip obstacles and destinations
                 continue
 
-            possible_moves = []
-
-            # Handle roads and traffic lights
-            if cell in ['>', '<', '^', 'v']:  # If it's a road
-                possible_moves.extend(directions[cell])  # Add primary direction
-
-                # Allow turns at corners if it's a road
-                if cell in ['>', '<']:  # Horizontal roads
-                    possible_moves.extend([(0, 1), (0, -1)])  # Up/Down movement
-                elif cell in ['^', 'v']:  # Vertical roads
-                    possible_moves.extend([(1, 0), (-1, 0)])  # Left/Right movement
-
-            elif cell == 's':  # Horizontal traffic light (left/right)
-                # Check next cells in left and right directions
-                next_right_pos = (pos[0] + 1, pos[1])  # Move right
-                next_left_pos = (pos[0] - 1, pos[1])  # Move left
-
-                if next_right_pos in cell_types and cell_types[next_right_pos] in ['>', 's']:
-                    possible_moves.append((1, 0))  # Right
-                if next_left_pos in cell_types and cell_types[next_left_pos] in ['<', 's']:
-                    possible_moves.append((-1, 0))  # Left
-
-            elif cell == 'S':  # Vertical traffic light (up/down)
-                # Check next cells in up and down directions
-                next_up_pos = (pos[0], pos[1] + 1)  # Move up
-                next_down_pos = (pos[0], pos[1] - 1)  # Move down
-
-                if next_up_pos in cell_types and cell_types[next_up_pos] in ['^', 'S']:
-                    possible_moves.append((0, 1))  # Up
-                if next_down_pos in cell_types and cell_types[next_down_pos] in ['v', 'S']:
-                    possible_moves.append((0, -1))  # Down
-
-
-            # Add edges based on possible movements
-            for dx, dy in possible_moves:
+            # Determine allowed moves
+            allowed_moves = self.get_allowed_moves(cell)
+            for dx, dy in allowed_moves:
                 next_pos = (pos[0] + dx, pos[1] + dy)
-                if next_pos in cell_types and cell_types[next_pos] != '#':  # Ensure valid cell
-                    # Add the edge to the graph
-                    city_graph.add_edge(pos, next_pos)
+                if next_pos in cell_types:
+                    next_cell = cell_types[next_pos]
+                    if self.valid_movement(cell, next_cell, dx, dy):
+                        city_graph.add_edge(pos, next_pos)
 
         return city_graph
+
+    def is_neighbor(self, pos, reference_pos):
+        """
+        Checks if a position is a direct neighbor of another.
+        """
+        neighbors = self.grid.get_neighborhood(reference_pos, moore=True, include_center=False)
+        return pos in neighbors
 
     def find_path(self, start_pos, end_pos, avoid_traffic=True):
         """
         Finds the shortest path between two positions using Dijkstra's algorithm.
-        If avoid_traffic is True, considers positions occupied by other cars or obstacles
-        by assigning a high cost to edges leading to those positions.
         """
         try:
+            allowed_nodes = set(self.navigation_graph.nodes)
+            if start_pos in self.corner_positions:
+                allowed_nodes -= set(self.corner_positions)
+                allowed_nodes.add(start_pos)
+            else:
+                allowed_nodes -= set(self.corner_positions)
+
+            other_destinations = set(self.destinations) - {end_pos}
+            allowed_nodes -= other_destinations
+
+            temp_graph = self.navigation_graph.subgraph(allowed_nodes)
+
             if avoid_traffic:
                 def weight(u, v, d):
-                    """
-                    Custom weight function for Dijkstra's algorithm.
-                    u: current node position
-                    v: neighbor node position
-                    d: edge data dictionary
-                    """
-                    # Check if the target position v is occupied by a Car or an Obstacle
+                    w = 1
                     cell_contents = self.grid.get_cell_list_contents([v])
                     if any(isinstance(agent, (Car, Obstacle)) for agent in cell_contents):
-                        return float('inf')  # Effectively block this edge
-                    else:
-                        # Add random penalty to encourage route diversity
-                        random_penalty = random.uniform(0.1, 0.5)
-                        return 1 + random_penalty  # Base cost plus penalty
+                        return float('inf')
+                    for corner in self.corner_positions:
+                        if self.is_neighbor(v, corner):
+                            w += 30
+                    return w
 
-                # Use Dijkstra's algorithm with the custom weight function
-                return nx.dijkstra_path(self.navigation_graph, start_pos, end_pos, weight=weight)
+                path = nx.dijkstra_path(temp_graph, start_pos, end_pos, weight=weight)
+                return path
             else:
-                # Standard shortest path without weights
-                return nx.shortest_path(self.navigation_graph, start_pos, end_pos)
+                path = nx.shortest_path(temp_graph, start_pos, end_pos)
+                return path
         except nx.NetworkXNoPath:
-            return None  # No path found
-
+            return None
 
     def try_spawn_car(self):
         """
-        Attempts to spawn new cars at available corner positions based on the probability N (density).
+        Attempts to spawn up to 4 cars at corner positions if available.
         """
-        if self.num_agents <= 0:  # If density is 0, no cars will spawn
-            return False
+        if self.step_count % 2 != 0:
+            return None
 
-        # Find all available corner positions
-        available_positions = []
+        available_positions = [
+            pos for pos in self.corner_positions
+            if not any(isinstance(agent, Car) for agent in self.grid.get_cell_list_contents([pos]))
+        ]
 
-        for pos in self.corner_positions:
-            cell_contents = self.grid.get_cell_list_contents([pos])
-            has_car = any(isinstance(agent, Car) for agent in cell_contents)
-            has_road = any(isinstance(agent, Road) for agent in cell_contents)
+        cars_to_spawn = min(4, len(available_positions))
+        spawned_cars = []
 
-            if has_road and not has_car:
-                available_positions.append(pos)
+        for i in range(cars_to_spawn):
+            pos = available_positions[i]
+            self.car_id_counter += 1
+            destination = random.choice(self.destinations)
+            car = Car(f"car_{self.car_id_counter}", self, destination)
+            self.grid.place_agent(car, pos)
+            self.schedule.add(car)
+            self.in_grid += 1
+            spawned_cars.append(car)
 
-        # Spawn cars based on the density probability (self.num_agents)
-        for pos in available_positions:
-            if random.random() < self.num_agents:  # Compare random value to density probability
-                # Create and place the car
-                self.car_id_counter += 1
-                car = Car(f"car_{self.car_id_counter}", self, random.choice(self.destinations))
-                self.grid.place_agent(car, pos)
-                self.schedule.add(car)
-                self.in_grid += 1
+        return spawned_cars
 
-        return len(available_positions) > 0
-        
     def toggle_traffic_lights(self):
         """
-        Toggles the state of all traffic lights such that S lights and s lights are synchronized.
+        Toggles the state of all traffic lights (synchronized for S and s).
         """
         if self.light_timer % self.light_cycle_duration == 0:
             for light in self.traffic_lights_S:
-                light.state = True  # S lights green
+                light.state = True
             for light in self.traffic_lights_s:
-                light.state = False  # s lights red
+                light.state = False
         elif self.light_timer % self.light_cycle_duration == self.light_cycle_duration // 2:
             for light in self.traffic_lights_S:
-                light.state = False  # S lights red
+                light.state = False
             for light in self.traffic_lights_s:
-                light.state = True  # s lights green
+                light.state = True
         self.light_timer += 1
 
     def step(self):
-        """Advance the model by one step and try to spawn new cars."""
-        # Toggle synchronized traffic lights
+        """
+        Advances the model by one step, toggles traffic lights, and spawns new cars.
+        """
+        self.step_count += 1
         self.toggle_traffic_lights()
-        self.try_spawn_car()
-        self.datacollector.collect(self)
         self.schedule.step()
+
+        cars_spawned = self.try_spawn_car()
+
+        if cars_spawned is not None and cars_spawned == []:
+            self.running = False
+
+        if not self.running:
+            cars = [agent for agent in self.schedule.agents if isinstance(agent, Car)]
+            for car in cars:
+                self.grid.remove_agent(car)
+                self.schedule.remove(car)
+                self.in_grid -= 1
+
+        self.datacollector.collect(self)
