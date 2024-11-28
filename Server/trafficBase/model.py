@@ -161,6 +161,13 @@ class CityModel(Model):
         reverse_direction = (-dx, -dy)
         if current_orientation == reverse_direction:
             return False
+        
+        if next_cell_type in ["s", "S"]:
+            forward_direction = self.arrow_orientations.get(current_cell_type)
+            if forward_direction:
+                right_turn_direction = (forward_direction[1], -forward_direction[0])  # Rotate forward direction 90° clockwise
+                if (dx, dy) == right_turn_direction:
+                    return False
 
         return True
 
@@ -250,7 +257,7 @@ class CityModel(Model):
         """
         Attempts to spawn up to 4 cars at corner positions if available.
         """
-        if self.step_count % 1 != 0:
+        if self.step_count % 2 != 0:
             return None
 
         available_positions = [
