@@ -70,7 +70,7 @@ const MAX_LIGHTS = 24;
 const updateInterval = 100; // milliseconds
 let lastUpdateTime = performance.now();
 // Initialize WebGL-related variables
-let gl, programInfo, agentArrays, agentsBufferInfo, agentsVao, BuildingVAO,wheelVAO,wheelBufferInfo,TrafficLightArrays,TrafficLightBuffer,TrafficLightVAO,BuildingBuffer,RoadBuffer,RoadVAO,SubterraBuffer,SubterraVAO;
+let gl, programInfo, agentArrays, agentsBufferInfo, agentsVao, BuildingVAO,Building2Buffer, Building2VAO,wheelVAO,wheelBufferInfo,TrafficLightArrays,TrafficLightBuffer,TrafficLightVAO,BuildingBuffer,RoadBuffer,RoadVAO,SubterraBuffer,SubterraVAO;
 
 // Define the camera position
 let cameraPosition = {x:0, y:9, z:9};
@@ -190,6 +190,35 @@ const objcetsBuilding= {
       vao: undefined,
   }
 }
+const objcetsBuilding2= {
+  model: {
+      transforms: {
+          // Translation
+          t: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Rotation in degrees
+          rd: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Rotation in radians
+          rr: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Scale
+          s: {
+              x: 1,
+              y: 1,
+              z: 1},
+      },
+      arrays: undefined,
+      bufferInfo: undefined,
+      vao: undefined,
+  }
+}
 const objcetsRoads= {
   model: {
       transforms: {
@@ -248,6 +277,35 @@ const objcetsRoads1= {
       vao: undefined,
   }
 }
+const objectsZeppeling= {
+  model: {
+      transforms: {
+          // Translation
+          t: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Rotation in degrees
+          rd: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Rotation in radians
+          rr: {
+              x: 0,
+              y: 0,
+              z: 0},
+          // Scale
+          s: {
+              x: 1,
+              y: -1,
+              z: 1},
+      },
+      arrays: undefined,
+      bufferInfo: undefined,
+      vao: undefined,
+  }
+}
 // Main function to initialize and run the application
 async function main() {
   const canvas = document.querySelector('canvas');
@@ -259,20 +317,26 @@ async function main() {
   //const newTrafficLight = new TrafficLight3D('trafficLight', [5, 0, 3]);
   //traficLights.push(newTrafficLight);
 
-  const obj3 = await loadObj('./Figures/coche.obj',true,"Car");
-  objcetsCar.model.arrays = obj3;
+  const obj1 = await loadObj('./Figures/coche.obj',true,"Car");
+  objcetsCar.model.arrays = obj1;
 
-  const obj4 = await loadObj('./Figures/Semaforo.obj',false,"TrafficLight");
-  objcetsTrafficLight.model.arrays = obj4;
+  const obj2 = await loadObj('./Figures/Semaforo2.obj',false,"TrafficLight");
+  objcetsTrafficLight.model.arrays = obj2;
 
-  const obj5 = await loadObj('./Figures/Building.obj',false,"Building");
-  objcetsBuilding.model.arrays = obj5;
+  const obj3 = await loadObj('./Figures/Building.obj',false,"Building");
+  objcetsBuilding.model.arrays = obj3;
 
-  const obj6 = await loadObj('./Figures/Road3.obj',false,"Road");
-  objcetsRoads.model.arrays = obj6;
+  const obj4 = await loadObj('./Figures/Building2.obj',false,"Building");
+  objcetsBuilding2.model.arrays = obj4;
+
+  const obj5 = await loadObj('./Figures/Road3.obj',false,"Road");
+  objcetsRoads.model.arrays = obj5;
   
-  const obj7 = await loadObj('./Figures/Subterra2.obj',false,"Road");
-  objcetsRoads1.model.arrays = obj7;
+  const obj6 = await loadObj('./Figures/Subterra2.obj',false,"Road");
+  objcetsRoads1.model.arrays = obj6;
+
+  const obj7 = await loadObj('./Figures/Zeppeling.obj',false,"Road");
+  objectsZeppeling.model.arrays = obj7;
   
   console.log("LightArray",objcetsTrafficLight.model.arrays )
   console.log("Car ARRAY:", objcetsCar.model.arrays);
@@ -287,6 +351,7 @@ async function main() {
   wheelBufferInfo = twgl.createBufferInfoFromArrays(gl, objcetsCar.model.arrays);
   TrafficLightBuffer = twgl.createBufferInfoFromArrays(gl, objcetsTrafficLight.model.arrays);
   BuildingBuffer = twgl.createBufferInfoFromArrays(gl, objcetsBuilding.model.arrays);
+  Building2Buffer = twgl.createBufferInfoFromArrays(gl, objcetsBuilding2.model.arrays);
   RoadBuffer = twgl.createBufferInfoFromArrays(gl, objcetsRoads.model.arrays);
   SubterraBuffer = twgl.createBufferInfoFromArrays(gl, objcetsRoads1.model.arrays);
   //BuildingBuffer = twgl.createBufferInfoFromArrays(gl, obstacleArrays);
@@ -296,6 +361,7 @@ async function main() {
   wheelVAO = twgl.createVAOFromBufferInfo(gl, programInfo, wheelBufferInfo);
   TrafficLightVAO = twgl.createVAOFromBufferInfo(gl, programInfo, TrafficLightBuffer);
   BuildingVAO = twgl.createVAOFromBufferInfo(gl, programInfo, BuildingBuffer);
+  Building2VAO = twgl.createVAOFromBufferInfo(gl, programInfo, Building2Buffer);
   RoadVAO = twgl.createVAOFromBufferInfo(gl, programInfo, RoadBuffer);
   SubterraVAO = twgl.createVAOFromBufferInfo(gl, programInfo, SubterraBuffer);
   //BuildingVAO = twgl.createVAOFromBufferInfo(gl, programInfo, BuildingBuffer);
@@ -415,26 +481,19 @@ async function getLights() {
  */
 async function getBuildings() {
   try {
-    // Send a GET request to the agent server to retrieve the obstacle positions
-    let response = await fetch(agent_server_uri + "getBuildings") 
-
-    // Check if the response was successful
-    if(response.ok){
-      // Parse the response as JSON
-      let result = await response.json()
-
-      // Create new obstacles and add them to the obstacles array
+    let response = await fetch(agent_server_uri + "getBuildings");
+    if (response.ok) {
+      let result = await response.json();
       for (const obstacle of result.positions) {
-        const newObstacle = new Building3D(obstacle.id, [obstacle.x, obstacle.y, obstacle.z])
-        Buildings.push(newObstacle)
+        const newObstacle = new Building3D(obstacle.id, [obstacle.x, obstacle.y, obstacle.z]);
+        // Assign a random model index (1 or 2)
+        newObstacle.modelIndex = Math.random() < 0.5 ? 1 : 2;
+        Buildings.push(newObstacle);
       }
-      // Log the obstacles array
-      console.log("Obstacles:", Buildings)
+      console.log("Buildings:", Buildings);
     }
-
   } catch (error) {
-    // Log any errors that occur during the request
-    console.log(error) 
+    console.log(error);
   }
 }
 
@@ -487,6 +546,20 @@ async function getDestinations() {
   }
 }
 
+async function getModelStats() {
+  try {
+    let response = await fetch(agent_server_uri + "getStats");
+    if (response.ok) {
+      let stats = await response.json();
+
+      // Update the UI with the fetched statistics
+      updateStatsUI(stats);
+    }
+  } catch (error) {
+    console.log("Error fetching model stats:", error);
+  }
+}
+
 /*
  * Updates the agent positions by sending a request to the agent server.
  */
@@ -498,6 +571,7 @@ async function update() {
       // Retrieve the updated agent positions
       await getAgents();
       await getLights();
+      await getModelStats();
       console.log("Updated agents");
     }
   } catch (error) {
@@ -540,7 +614,7 @@ async function drawScene(gl, programInfo, wheelBufferInfo, wheelVAO, BuildingVAO
   drawSubterra(distance, SubterraVAO, SubterraBuffer, viewProjectionMatrix);
   drawAgents(distance, wheelVAO, wheelBufferInfo, viewProjectionMatrix); 
   drawTrafficLights(distance, TrafficLightVAO, TrafficLightBuffer, viewProjectionMatrix); 
-  drawBuildings(distance, BuildingVAO, BuildingBuffer, viewProjectionMatrix);
+  drawBuildings(distance, viewProjectionMatrix);
   drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix);
 
   const currentTime = performance.now();
@@ -688,13 +762,11 @@ function drawTrafficLights(distance, trafficLightVAO, trafficLightBufferInfo, vi
  * @param {Object} BuildingBuffer - The buffer information for obstacles.
  * @param {Float32Array} viewProjectionMatrix - The view-projection matrix.
  */
-function drawBuildings(distance, BuildingVAO, BuildingBuffer, viewProjectionMatrix){
-  gl.bindVertexArray(BuildingVAO);
-
+function drawBuildings(distance, viewProjectionMatrix) {
   Buildings.forEach(Building => {
     const translation = twgl.v3.create(...Building.position);
     const scale = twgl.v3.create(...Building.scale);
-    
+
     // Create model matrix
     let modelMatrix = twgl.m4.identity();
     modelMatrix = twgl.m4.translate(modelMatrix, translation);
@@ -702,28 +774,38 @@ function drawBuildings(distance, BuildingVAO, BuildingBuffer, viewProjectionMatr
     modelMatrix = twgl.m4.rotateY(modelMatrix, Building.rotation[1]);
     modelMatrix = twgl.m4.rotateZ(modelMatrix, Building.rotation[2]);
     modelMatrix = twgl.m4.scale(modelMatrix, scale);
-    
-    // Compute the model-view-projection matrix
+
+    // Compute matrices
     const mvpMatrix = twgl.m4.multiply(viewProjectionMatrix, modelMatrix);
-    
-    // Compute the world inverse transpose matrix for normals
     const worldInverseTranspose = twgl.m4.transpose(twgl.m4.inverse(modelMatrix));
-    
-    // Set uniforms for this building
+
+    // Set uniforms
     twgl.setUniforms(programInfo, {
       u_world: modelMatrix,
       u_matrix: mvpMatrix,
       u_worldInverseTranspose: worldInverseTranspose,
-      u_ambientColor: [0.0, 0.5, 0.5, 1.0],  // Teal color
+      u_ambientColor: [0.0, 0.5, 0.5, 1.0],
       u_diffuseColor: [0.0, 0.5, 0.5, 1.0],
       u_specularColor: [0.0, 0.5, 0.5, 1.0],
-      u_emissiveColor: [0.0,0.0,0.0,1.0],
+      u_emissiveColor: [0.0, 0.0, 0.0, 1.0],
     });
-    
-    // Draw the building
-    twgl.drawBufferInfo(gl, BuildingBuffer);
+
+    // Choose the VAO and buffer based on modelIndex
+    let currentVAO, currentBufferInfo;
+    if (Building.modelIndex === 1) {
+      currentVAO = BuildingVAO;
+      currentBufferInfo = BuildingBuffer;
+    } else {
+      currentVAO = Building2VAO;
+      currentBufferInfo = Building2Buffer;
+    }
+
+    // Bind the VAO and draw the building
+    gl.bindVertexArray(currentVAO);
+    twgl.drawBufferInfo(gl, currentBufferInfo);
   });
 }
+
 
 
 function drawRoads(distance, RoadVAO, RoadBuffer, viewProjectionMatrix){
@@ -883,9 +965,9 @@ function setupUI() {
   lightingFolder.addColor(lighting, 'specularLight').name('Specular Light').onChange(updateLighting);
 
   // Add color controls for material colors
-  lightingFolder.addColor(lighting, 'ambientColor').name('Ambient Color').onChange(updateLighting);
-  lightingFolder.addColor(lighting, 'diffuseColor').name('Diffuse Color').onChange(updateLighting);
-  lightingFolder.addColor(lighting, 'specularColor').name('Specular Color').onChange(updateLighting);
+  //lightingFolder.addColor(lighting, 'ambientColor').name('Ambient Color').onChange(updateLighting);
+  //lightingFolder.addColor(lighting, 'diffuseColor').name('Diffuse Color').onChange(updateLighting);
+  //lightingFolder.addColor(lighting, 'specularColor').name('Specular Color').onChange(updateLighting);
 
   // Add control for shininess
   lightingFolder.add(lighting, 'shininess', 0, 100).name('Shininess').onChange(updateLighting);
@@ -921,6 +1003,11 @@ function updateTrafficLightUniforms() {
       lighting.trafficLightDirections.set([0, -1, 0], i * 3); 
       lighting.trafficLightCutoffs[i] = Math.cos(30 * Math.PI / 180); 
   }
+}
+function updateStatsUI(stats) {
+  // Assuming you have elements with IDs 'cars-in-grid' and 'cars-reached-destination'
+  document.getElementById('cars-in-grid').textContent = stats.in_grid;
+  document.getElementById('cars-reached-destination').textContent = stats.reached_destination;
 }
 async function loadObj(route, shouldScaleSmall,type) {
   try {
